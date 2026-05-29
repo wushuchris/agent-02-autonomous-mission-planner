@@ -109,7 +109,7 @@ To run the live model, add your token as `HF_TOKEN` in Streamlit secrets or your
 """
 
     client = InferenceClient(
-        model="mistralai/Mistral-7B-Instruct-v0.3",
+        model="Qwen/Qwen2.5-7B-Instruct",
         token=hf_token
     )
 
@@ -120,7 +120,7 @@ To run the live model, add your token as `HF_TOKEN` in Streamlit secrets or your
                 "content": (
                     "You are a careful, safety-focused search and rescue planning assistant. "
                     "You support humanitarian planning only and do not provide harmful, weaponized, "
-                    "or tactical engagement guidance."
+                    "targeting, attack, evasion, or tactical engagement guidance."
                 )
             },
             {
