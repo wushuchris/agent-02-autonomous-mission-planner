@@ -69,7 +69,7 @@ The agent converts that intent into a structured plan with search phases, asset 
 - Python
 - Streamlit
 - Hugging Face Inference API
-- Mistral-7B-Instruct
+- Qwen/Qwen2.5-7B-Instruct
 - python-dotenv
 
 ## Portfolio Context
