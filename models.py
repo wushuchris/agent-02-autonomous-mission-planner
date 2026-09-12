@@ -119,6 +119,16 @@ class ReplanAttempt(PlanningModel):
     validation_result: ValidationResult
 
 
+class PlanningCallRecord(PlanningModel):
+    """One model call, including calls that produced no usable plan."""
+
+    attempt_number: int = Field(ge=0, description="0 is initial generation; 1 and 2 are revisions.")
+    started_at: datetime
+    completed_at: datetime
+    outcome: str
+    error_code: Optional[str] = None
+
+
 class PlanningRunRecord(PlanningModel):
     """Auditable record for one end-to-end planning run."""
 
@@ -130,5 +140,13 @@ class PlanningRunRecord(PlanningModel):
     final_plan: Optional[MissionPlan] = None
     final_status: PlanStatus = PlanStatus.DRAFT
     human_decision: HumanDecision = HumanDecision.PENDING
+    review_notes: str = ""
+    review_fingerprint: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    reviewable_plan: Optional[MissionPlan] = None
+    calls: list[PlanningCallRecord] = Field(default_factory=list)
+    stop_reason: str = ""
+    model_name: str = "Qwen/Qwen2.5-7B-Instruct"
+    audit_version: int = 1
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -11,6 +11,7 @@ from approval import decide_proposal, proposal_fingerprint
 from planner import PlannerOutputError, plan_to_markdown
 from plan_graph import build_plan_graph
 from planning_engine import run_planning
+from audit import new_run, record_decision, export_run
 
 
 load_dotenv()
@@ -188,7 +189,7 @@ planning_depth = st.selectbox(
 generate_button = st.button("Generate Structured Search and Rescue Plan", type="primary")
 
 if generate_button:
-    for key in ("mission_plan", "mission_request", "validation_result", "planning_outcome", "review_decision", "review_notes", "review_ack"):
+    for key in ("mission_plan", "mission_request", "validation_result", "planning_outcome", "review_decision", "review_notes", "review_ack", "audit_record"):
         st.session_state.pop(key, None)
     try:
         mission_request = build_mission_request(
@@ -203,10 +204,12 @@ if generate_button:
             planning_depth=planning_depth,
         )
 
+        st.session_state["audit_record"] = new_run(mission_request)
         with st.spinner("Generating and validating a plan (up to two revisions)..."):
             outcome = run_planning(
                 mission_request=mission_request,
                 hf_token=get_hf_token(),
+                audit_record=st.session_state["audit_record"],
             )
 
         plan = outcome.plan
@@ -254,6 +257,8 @@ if "mission_plan" in st.session_state:
         if choice is not None:
             try:
                 plan, record = decide_proposal(mission_request, plan, choice, fingerprint, notes)
+                updated_audit = record_decision(st.session_state["audit_record"], plan, record)
+                st.session_state["audit_record"] = updated_audit
                 st.session_state["mission_plan"] = plan
                 st.session_state["review_decision"] = record
                 st.rerun()
@@ -339,3 +344,13 @@ if "mission_plan" in st.session_state:
             file_name="search_and_rescue_mission_plan.json",
             mime="application/json",
         )
+
+
+if "audit_record" in st.session_state:
+    audit_record = st.session_state["audit_record"]
+    st.subheader("Planning Run Audit")
+    st.caption("Save this JSON to retain the complete run after the session ends. It contains the saved mission inputs, proposals, validation history, call outcomes and human decision. Credentials and raw provider errors are excluded.")
+    with st.expander("View Complete Run Record"):
+        st.json(audit_record.model_dump(mode="json"))
+    st.download_button("Download Complete Audit JSON", export_run(audit_record),
+                       f"planning_run_{audit_record.run_id}.json", "application/json")
