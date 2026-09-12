@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from models import HumanDecision, MissionRequest, PlanningDepth
 from approval import decide_proposal, proposal_fingerprint
+from model_adapter import ModelConfigurationError, ModelServiceError
 from planner import PlannerOutputError, plan_to_markdown
 from plan_graph import build_plan_graph
 from planning_engine import run_planning
@@ -96,6 +97,10 @@ with st.sidebar:
         "Current upgrade stage: structured planning, schema validation, deterministic graph checks and bounded replanning. "
         "Up to two revisions are allowed, followed by an explicit human review decision."
     )
+
+    st.header("Inference Runtime")
+    st.write("Hugging Face Inference Providers through the OpenAI-compatible API.")
+    st.caption(f"Configured model: {os.getenv('MODEL_ID', 'MODEL_ID not configured')}")
 
     st.header("Safety Boundary")
     st.write(
@@ -224,6 +229,15 @@ if generate_button:
     except ValidationError as exc:
         st.error("The mission request did not satisfy the planning input schema.")
         st.code(str(exc))
+    except ModelConfigurationError as exc:
+        st.error(str(exc))
+        st.info(
+            "Configure HF_TOKEN as a secret and MODEL_ID as a runtime variable. "
+            "HF_BASE_URL defaults to the Hugging Face Inference Providers router."
+        )
+    except ModelServiceError as exc:
+        st.error(str(exc))
+        st.info("No plan was accepted. The failed run remains available in the audit download.")
     except PlannerOutputError as exc:
         st.error(str(exc))
         st.info(

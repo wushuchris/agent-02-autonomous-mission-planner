@@ -146,7 +146,7 @@ class PlanningRunRecord(PlanningModel):
     reviewable_plan: Optional[MissionPlan] = None
     calls: list[PlanningCallRecord] = Field(default_factory=list)
     stop_reason: str = ""
-    model_name: str = "Qwen/Qwen2.5-7B-Instruct"
+    model_name: str = "MODEL_ID not configured"
     audit_version: int = 1
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

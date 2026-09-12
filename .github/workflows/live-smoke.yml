@@ -1,0 +1,32 @@
+name: Live inference smoke
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: Hugging Face Inference Providers model identifier
+        required: true
+        default: Qwen/Qwen3.8-27B:ovhcloud
+      base_url:
+        description: OpenAI-compatible Hugging Face router URL
+        required: true
+        default: https://router.huggingface.co/v1
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Run one deliberate live planning check
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          MODEL_ID: ${{ inputs.model_id }}
+          HF_BASE_URL: ${{ inputs.base_url }}
+        run: python scripts/live_smoke_test.py

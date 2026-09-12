@@ -1,4 +1,5 @@
-streamlit
-huggingface_hub
-python-dotenv
-pydantic
+streamlit>=1.39,<2
+huggingface_hub>=0.25,<1
+python-dotenv>=1,<2
+pydantic>=2.7,<3
+openai>=1.40,<3
