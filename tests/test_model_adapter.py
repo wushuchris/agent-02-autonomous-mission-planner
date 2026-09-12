@@ -10,8 +10,8 @@ from model_adapter import (
     _service_message,
     _timeout_message,
 )
-from models import MissionRequest
-from planner import generate_structured_plan
+from models import MissionPlan, MissionRequest, PlanningDepth
+from planner import build_structured_prompt, generate_structured_plan
 
 
 class FakeCompletions:
@@ -39,7 +39,7 @@ class FakeOpenAIClient:
         )
 
 
-def request():
+def request(planning_depth=PlanningDepth.STANDARD):
     return MissionRequest(
         mission_id="sar-test",
         objective="Locate a missing hiker.",
@@ -50,6 +50,7 @@ def request():
         constraints=["Maintain visual line of sight"],
         approval_rules=["Coordinator approves search-area expansion"],
         success_criteria=["Complete one documented sweep"],
+        planning_depth=planning_depth,
     )
 
 
@@ -104,6 +105,7 @@ class ModelAdapterTests(unittest.TestCase):
         )
         self.assertEqual(client.base_url, HF_DEFAULT_BASE_URL)
         self.assertEqual(client.timeout_seconds, 120.0)
+        self.assertEqual(client.max_tokens, 5000)
 
     def test_rejects_non_https_base_url(self):
         with self.assertRaises(ModelConfigurationError):
@@ -127,6 +129,7 @@ class ModelAdapterTests(unittest.TestCase):
         call = fake.chat.completions.calls[0]
         self.assertEqual(call["model"], "model")
         self.assertNotIn("reasoning_effort", call)
+        self.assertNotIn("response_format", call)
 
     def test_qwen38_requests_low_reasoning(self):
         fake = FakeOpenAIClient('{"ok": true}')
@@ -138,7 +141,35 @@ class ModelAdapterTests(unittest.TestCase):
         client.complete_json(system_prompt="system", user_prompt="user")
         call = fake.chat.completions.calls[0]
         self.assertEqual(call["reasoning_effort"], "low")
-        self.assertEqual(call["max_tokens"], 3600)
+        self.assertEqual(call["max_tokens"], 5000)
+
+    def test_native_json_schema_is_sent_when_configured(self):
+        fake = FakeOpenAIClient(valid_plan_json())
+        schema = MissionPlan.model_json_schema()
+        client = HuggingFaceChatClient(
+            model_id="Qwen/Qwen3.8-27B:ovhcloud",
+            token="test-token",
+            response_schema=schema,
+            client=fake,
+        )
+        client.complete_json(system_prompt="system", user_prompt="user")
+        response_format = fake.chat.completions.calls[0]["response_format"]
+        self.assertEqual(response_format["type"], "json_schema")
+        self.assertEqual(response_format["json_schema"]["name"], "MissionPlan")
+        self.assertEqual(response_format["json_schema"]["schema"], schema)
+        self.assertTrue(response_format["json_schema"]["strict"])
+
+    def test_standard_prompt_bounds_plan_size(self):
+        prompt = build_structured_prompt(request(PlanningDepth.STANDARD))
+        self.assertIn("Planning depth is Standard; use no more than 6 tasks", prompt)
+        self.assertIn("task description under 300 characters", prompt)
+        self.assertIn("no more than 3 completion criteria per task", prompt)
+
+    def test_quick_and_detailed_depths_have_distinct_task_limits(self):
+        quick = build_structured_prompt(request(PlanningDepth.QUICK))
+        detailed = build_structured_prompt(request(PlanningDepth.DETAILED))
+        self.assertIn("use no more than 4 tasks", quick)
+        self.assertIn("use no more than 8 tasks", detailed)
 
     def test_empty_response_fails_closed(self):
         client = HuggingFaceChatClient(
