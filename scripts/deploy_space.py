@@ -6,7 +6,7 @@ from huggingface_hub import HfApi, CommitOperationAdd
 SPACE = 'FlyingNunchucks/search-and-rescue-mission-planner'
 ROOT = Path(__file__).resolve().parents[1]
 FILES = {'app.py': 'src/streamlit_app.py', 'requirements.txt': 'requirements.txt'}
-for name in ('models', 'planner', 'plan_graph', 'validator', 'planning_engine', 'approval', 'audit'):
+for name in ('models', 'model_adapter', 'planner', 'plan_graph', 'validator', 'planning_engine', 'approval', 'audit'):
     FILES[f'{name}.py'] = f'src/{name}.py'
 
 
