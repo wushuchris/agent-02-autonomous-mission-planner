@@ -8,6 +8,7 @@ from model_adapter import (
     ModelConfigurationError,
     StructuredModelError,
     _service_message,
+    _timeout_message,
 )
 from models import MissionRequest
 from planner import generate_structured_plan
@@ -102,6 +103,7 @@ class ModelAdapterTests(unittest.TestCase):
             }
         )
         self.assertEqual(client.base_url, HF_DEFAULT_BASE_URL)
+        self.assertEqual(client.timeout_seconds, 120.0)
 
     def test_rejects_non_https_base_url(self):
         with self.assertRaises(ModelConfigurationError):
@@ -161,6 +163,12 @@ class ModelAdapterTests(unittest.TestCase):
         self.assertIn("credits or billing", _service_message(402).lower())
         self.assertIn("rate limit", _service_message(429).lower())
         self.assertNotIn("traceback", _service_message(500).lower())
+
+    def test_timeout_message_is_bounded_and_actionable(self):
+        message = _timeout_message(120.0)
+        self.assertIn("120 seconds", message)
+        self.assertIn("Try again", message)
+        self.assertNotIn("traceback", message.lower())
 
     def test_planner_accepts_provider_neutral_client(self):
         fake_adapter = HuggingFaceChatClient(
