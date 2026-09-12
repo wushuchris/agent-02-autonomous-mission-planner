@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 
 HF_DEFAULT_BASE_URL = "https://router.huggingface.co/v1"
+_LOW_REASONING_MODEL_PREFIXES = ("Qwen/Qwen3.8-",)
 
 
 class ModelConfigurationError(RuntimeError):
@@ -45,6 +46,11 @@ def _service_message(status_code: int | None) -> str:
     return "The inference provider is unavailable or failed to respond. Try again later."
 
 
+def _uses_low_reasoning(model_id: str) -> bool:
+    """Use the documented low reasoning setting for Qwen3.8 structured output."""
+    return model_id.startswith(_LOW_REASONING_MODEL_PREFIXES)
+
+
 @dataclass(frozen=True)
 class HuggingFaceChatClient:
     """OpenAI-compatible Hugging Face Inference Providers adapter.
@@ -57,7 +63,7 @@ class HuggingFaceChatClient:
     token: str
     base_url: str = HF_DEFAULT_BASE_URL
     temperature: float = 0.2
-    max_tokens: int = 2200
+    max_tokens: int = 3600
     timeout_seconds: float = 45.0
     client: Any | None = None
 
@@ -111,17 +117,23 @@ class HuggingFaceChatClient:
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> str:
         client = self._get_client()
+        request: dict[str, Any] = {
+            "model": self.model_id,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+        }
+        if _uses_low_reasoning(self.model_id):
+            # Qwen3.8 can otherwise spend the bounded completion budget on hidden
+            # reasoning before emitting the visible JSON object. This is the same
+            # documented OpenAI-compatible setting used by the newer portfolio agents.
+            request["reasoning_effort"] = "low"
 
         try:
-            response = client.chat.completions.create(
-                model=self.model_id,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
+            response = client.chat.completions.create(**request)
         except Exception as exc:
             # Import lazily so deterministic tests can inject a fake client without
             # requiring the OpenAI SDK to be imported at module load time.
@@ -136,7 +148,18 @@ class HuggingFaceChatClient:
                 raise ModelServiceError(_service_message(None)) from None
             raise
 
-        content = response.choices[0].message.content
+        choice = response.choices[0]
+        finish_reason = getattr(choice, "finish_reason", None)
+        if finish_reason == "length":
+            raise StructuredModelError(
+                f"The inference provider truncated the structured response at max_tokens={self.max_tokens}."
+            )
+        if finish_reason not in {None, "stop"}:
+            raise StructuredModelError(
+                f"The inference provider ended the structured response unexpectedly: finish_reason={finish_reason}."
+            )
+
+        content = choice.message.content
         if not isinstance(content, str) or not content.strip():
             raise StructuredModelError("The inference provider returned an empty chat response.")
         return content.strip()
