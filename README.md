@@ -1,259 +1,154 @@
-# Search and Rescue Mission Planning Agent
+# Planning Agent — Search and Rescue Mission Planner
 
-Agent 2 in my **30 Agents for AI Engineers** portfolio.
+Agent 02 in **30 Agents for AI Engineers**. A reusable planning primitive demonstrated
+through humanitarian search and rescue: turn objectives, resources and constraints into
+structured proposals, check them, revise within limits, and record human review.
 
-This project is a human-in-the-loop mission planning assistant for search and rescue scenarios. It converts high-level rescue intent into structured mission plans with search phases, asset allocation, risks, communication checkpoints, safety considerations, and next best actions.
+> **The LLM proposes. Rules validate. The agent replans. Humans approve.**
 
-## Important Disclaimer
+This is an educational advisory prototype. It does not replace trained responders,
+incident commanders, emergency services or legal authority. Approval in this app records
+review of a proposal; it does not authorize real-world execution. No drones, vehicles or
+other actuators are connected. Weaponization, targeting, attack planning, evasion and
+harmful engagement are outside its scope.
 
-This project is an educational portfolio prototype for search and rescue planning. It is not a production emergency response system, does not replace trained responders or incident commanders, and should not be used for real-world mission execution without proper validation, safety controls, legal review, and human supervision.
+## Business case
 
-## Project Purpose
+Complex plans often omit dependencies, resources, constraints or decision points.
+This project demonstrates how structured proposals and repeatable checks can expose
+those omissions before human review. A complete JSON record makes the request, revisions,
+validation findings and human disposition inspectable. No measured time or cost savings
+are claimed; the evidence here is engineering behavior on synthetic cases.
 
-Search and rescue operations often require teams to make decisions under uncertainty, limited visibility, changing weather, terrain constraints, and incomplete information.
-
-This agent demonstrates how an AI planning system can help organize a safe and structured response plan for humanitarian and emergency scenarios. It is designed to support planning, not replace trained responders or incident commanders.
-
-## What the Agent Does
-
-The agent takes mission inputs such as:
-
-- Rescue objective
-- Search environment
-- Search area
-- Available assets
-- Sensor payloads
-- Operational constraints
-- Human approval rules
-- Success criteria
-- Planning depth
-
-It returns a structured mission plan with:
-
-- Mission summary
-- Mission assumptions
-- Search phases
-- Asset allocation
-- Dependencies
-- Risk assessment
-- Human-in-the-loop checkpoints
-- Safe response recommendations
-- Success criteria review
-- Next best action
-
-## Safety Boundary
-
-This project is designed for humanitarian, emergency response, and public safety planning. It does not provide support for weaponization, targeting, attack planning, evasion, or harmful engagement logic.
-
-The agent focuses on:
-
-- Search and rescue
-- Missing person response
-- Disaster response
-- Infrastructure inspection after emergencies
-- Wilderness search planning
-- Flood, wildfire, or earthquake response
-- Operator alerts
-- Human approval workflows
-
-## Example Use Case
-
-An incident coordinator provides the following intent:
-
-> Search a 30-meter area around the last known location of a missing hiker, complete one full sweep, report findings, identify possible hazards, and recommend the next safest search action.
-
-The agent converts that intent into a structured plan with search phases, asset tasking, risks, checkpoints, and next actions.
-
-## Tech Stack
-
-- Python
-- Streamlit
-- Hugging Face Inference API
-- Qwen/Qwen2.5-7B-Instruct
-- python-dotenv
-
-## Portfolio Context
-
-This is part of my broader **30 Agents for AI Engineers** learning portfolio.
-
-Agent 1 focused on autonomous decision-making.
-
-Agent 2 focuses on planning: decomposing a complex objective into structured, executable steps with dependencies, risks, and human oversight.
-
-## Disclaimer
-
-This project is for educational and portfolio purposes. It is not a production emergency response system and should not be used for real-world mission execution without trained responders, appropriate engineering validation, safety controls, legal review, and human supervision.
-## Phase 3 — Plan Graph and Deterministic Validator
-
-**Business case:** Reduce omissions before a person reviews a proposal by exposing
-broken dependencies, unavailable resources, missing constraint coverage and approval requirements.
-
-**Engineering case:** Separate the LLM proposal from repeatable checks that run without
-an LLM or Streamlit. The Phase 3 foundation is:
+## Engineering case and reusable pattern
 
 ```text
-MissionRequest → structured planner → MissionPlan schema check
-→ dependency graph → deterministic validator → advisory proposal + ValidationResult
+MissionRequest → LLM proposal → MissionPlan schema check
+→ dependency graph + deterministic validation
+    FAIL → latest proposal + feedback → at most 2 revisions
+    PASS → human review
+→ approve / reject / request revision → PlanningRunRecord JSON
 ```
 
-- `plan_graph.py` checks unique task IDs, missing dependencies and cycles (including
-  self-dependencies), and returns a topological order for structurally valid graphs.
-  If IDs or references are invalid, graph sorting/cycle analysis is deferred until
-  they are repaired. The order is not a schedule or authorization to execute.
-- `validator.py` checks resource membership, nonblank completion criteria, next-action
-  presence, mission identity, explicit constraint representation and approval requirements.
-  Errors are available both in `errors` and the existing category lists;
-  `resource_conflicts` currently contains membership errors, not capacity analysis.
-- `MissionPlan.covered_constraints` is a backward-compatible field defaulting to `[]`.
-  The planner copies each request constraint into it. Missing or unknown entries fail
-  validation. Whole-entry matching ignores case and repeated whitespace, but not wording.
-  Copying a constraint proves representation only, **not semantic compliance**.
-- Resource assignments must use exact `available_resources` labels (ignoring case and
-  repeated whitespace). Quantity labels are not split into inferred units; sensors are
-  context, not separately assignable resources unless also listed as available resources.
-- Each request approval rule must appear in `approval_gates`. Because free-text rules
-  cannot reliably be assigned to individual tasks, any request approval rule conservatively
-  requires **every task** to set `human_approval_required`. High/critical risk tasks also
-  require approval. Sensitive tasks need a nonblank gate and must stay `planned` or
-  `blocked`; `ready`, `in_progress`, `complete` and a plan claiming `APPROVED` cannot be
-  accepted without trusted approval evidence. Phase 3 has no approval-record input.
-- The Phase 3 validator reports failures as `VALIDATION_FAILED` before the Phase 4 retry loop.
-  The app shows schema validity separately from deterministic validity, structured
-  graph details, errors and limitations. After Phase 4 exhaustion, failed proposals become `REQUIRES_HUMAN_REVIEW`;
-  passing proposals become `AWAITING_HUMAN_APPROVAL` when gated, otherwise
-  `REQUIRES_HUMAN_REVIEW`. The planner and validator never approve a proposal; Phase 5 records an explicit human review decision. Markdown and plan JSON retain
-  that status; a separate validation JSON download exposes all findings.
+The engine is independent of Streamlit. It can support future orchestration, logistics,
+incident-response and multi-agent decomposition work, while this interface remains a
+search-and-rescue demonstration.
 
-The validator does not prove real-world safety, interpret arbitrary natural-language
-constraints, resolve scheduling/capacity conflicts, verify gate timing or identify all
-missing critical facts. Unresolved questions are surfaced for human review. There are
-no task times, resource capacities or structured constraint predicates in the current
-contract, so these limits are explicit rather than inferred from prose.
+| Module | Responsibility |
+| --- | --- |
+| `models.py` | Request, plan, validation, state and audit contracts |
+| `planner.py` | Qwen structured generation, schema/mission identity checks and Markdown rendering |
+| `plan_graph.py` | Unique IDs, existing dependencies, cycles and topological order |
+| `validator.py` | Deterministic resource, completion, approval, constraint-representation and next-action checks |
+| `planning_engine.py` | Up to two revisions after the initial proposal; stop on success or escalate |
+| `approval.py` | Human decisions with revalidation and changed-proposal detection |
+| `audit.py` | Review-linked snapshots and complete JSON export |
+| `app.py` | Mission input, proposal review, human decision and downloads |
+| `evaluation/` | Synthetic scenarios, expectations and JSON scorecard |
 
-### Run and verify
+## Run locally
+
+Use Python 3.11 (the CI version):
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m unittest discover -s tests -v
 streamlit run app.py
 ```
 
-The focused tests cover valid and invalid graphs, resource labels, completion criteria,
-constraint representation, approval policy, status handling and Streamlit pass/fail/error
-behavior. Model calls in app tests are mocked; they require no token or network access.
-This is Phase 3 regression coverage, not the full Phase 7 evaluation package.
+Set `HF_TOKEN` in your environment, a local `.env` file, or Streamlit secrets.
+Do not commit credentials; `.env` and `.streamlit/secrets.toml` are ignored.
+The default model is `Qwen/Qwen2.5-7B-Instruct` through Hugging Face InferenceClient.
+Provider access is required for generation. Tests and offline evaluation require no token.
 
-## Phase 4 — Bounded Replanning
+## Walkthrough
 
-`planning_engine.run_planning` now wraps the existing planner and validator. After
-an invalid proposal it sends the original request, latest proposal and structured
-validation feedback to the planner. It permits at most **two replan attempts**
-(three planner calls total), validates every returned proposal and stops on success.
-Passing plans still await human approval or review; no run authorizes execution.
+1. Describe the mission, resources, constraints, approval rules and success criteria.
+2. Generate a proposal. The engine validates it and permits at most two revisions.
+3. Review the saved mission inputs, proposal, schema status, deterministic findings,
+   revision count and unresolved questions. Detailed JSON and graph data are expandable.
+4. Approve only after acknowledgement and passing validation, reject, or request revision
+   with notes. Revision requests require editing inputs and generating a new proposal.
+5. Download the plan and complete audit JSON before starting another run or ending the session.
 
-**Business value:** Correct mechanically detectable omissions automatically while
-keeping a clear limit on model usage and preserving human review for unresolved failures.
-**Engineering behavior:** Retry control is deterministic and independent of the LLM
-and Streamlit. Previous proposals and feedback are serialized as untrusted JSON data;
-the existing humanitarian rules, schema check and mission identity check still apply.
+Editing form fields alone does not modify the saved proposal being reviewed. New generation
+clears the prior decision and acknowledgement. Terminal decisions cannot be overwritten.
+Review controls appear after the proposal and findings so the decision follows the evidence.
 
-If both revisions fail validation, the final invalid proposal is labeled
-`REQUIRES_HUMAN_REVIEW`. If a revision fails schema/identity checks or the provider
-fails, the loop stops early and retains the last invalid proposal with the same
-review status and a visible explanation. Initial generation errors still fail closed
-without retries. Provider error details are not shown or saved in the outcome.
-The limit bounds planner calls; it is not a wall-clock or provider-internal retry budget.
+## Exact checks and limits
 
-Streamlit shows the number of revisions, each schema-valid revision's validation
-result, and any stop reason. The displayed proposal's schema status is separate from
-its deterministic validity. Markdown exports include the count and stop reason.
-The outcome now carries the Phase 6 audit record; malformed
-responses and service failures have no structured plan to include in revision history.
+- Resource assignments match whole `available_resources` labels after case/whitespace
+  normalization. Quantity labels are not split into inferred units; sensors are context
+  unless also listed as assignable resources. Capacity and timing are not modeled.
+- Constraints must appear in `covered_constraints`, with whole-entry normalized matching.
+  This proves representation, **not semantic compliance**. Unknown entries are rejected.
+- Each approval rule must appear in `approval_gates`. Since rules are free text, any request
+  approval rule conservatively gates every task. High/critical risk also requires approval.
+  Sensitive tasks must remain planned or blocked; prose cannot establish actual approval.
+- Task IDs must be unique, references must exist, and valid graphs must be acyclic.
+  Duplicate IDs or missing references defer sorting/cycle analysis until repaired.
+  A topological order is not a schedule or permission to execute.
+- Completion criteria must be nonblank and a next action must exist. These checks do not
+  establish completeness or quality of a real mission plan.
 
-The tests include no-retry success, repair on either revision, exhausted retries,
-latest-feedback propagation, schema/identity rejection and safe service-error handling.
-Model calls are mocked; no live model quality evaluation or Space deployment is included.
+Missing facts, milestone coverage, scheduling conflicts, gate timing and arbitrary prose
+meaning still require qualified review. Human reviewers are not authenticated in this
+prototype; fingerprints detect content changes, not identity or caller authorization.
 
-## Phase 5 — Human Approval State Machine
+## Failure and review behavior
 
-The app now offers approve, reject and request-revision controls for the displayed
-proposal and its saved mission request. Approval requires review acknowledgement and
-passing deterministic validation; `approval.decide_proposal` independently revalidates
-before approval. Rejection is available for invalid proposals. Revision requires notes
-and moves the plan to the additive `REVISION_REQUESTED` status.
+Initial malformed output or service failure stops without retrying. A schema-valid but
+invalid proposal receives up to two revisions (three planner calls total). Each revision
+uses the original request, latest proposal and structured feedback. Exhaustion escalates
+to `REQUIRES_HUMAN_REVIEW`; malformed revisions or service failures stop early and retain
+the last invalid proposal for review. The call budget is not a wall-clock or provider-internal
+retry limit. Invalid proposals cannot be approved through the review function.
 
-**Business value:** Make the human disposition explicit instead of leaving review as
-prose. **Engineering behavior:** A separate transition function accepts decisions only
-from reviewable states and checks a fingerprint of the saved request and proposal.
-Final decisions cannot be overwritten; a new generation clears the decision and review
-acknowledgement. Task states stay unchanged. Approval is advisory review, never an
-execution command or replacement for operational authorization.
+Passing proposals await human approval or review. Human decisions set `APPROVED`, `REJECTED`
+or `REVISION_REQUESTED`; task execution states remain unchanged. Human-requested revision
+starts no hidden model call. Safety framing is preserved in prompts, but live-model
+obedience and prompt-injection resistance have not been evaluated.
 
-Requesting revision does not call the LLM automatically: the user edits mission inputs
-using their notes and generates a fresh proposal under the same two-retry budget.
-Editing input fields alone does not change the saved proposal being reviewed.
+## Audit and storage
 
-Decision, notes, timestamp and proposal fingerprint are retained in Streamlit session
-state and downloadable as review JSON. Markdown includes the human disposition, and
-plan JSON includes the resulting status. These are prototype session decisions, not
-identity-authenticated approvals. The fingerprint detects changed content; it does not
-prove identity or prevent a trusted caller from fabricating a decision. Session loss
-loses the record unless downloaded. Phase 6 adds a complete run export; server-side persistence is not enabled.
+Each record includes a run ID, saved request, initial plan, validation history, revisions,
+all model-call outcomes and timestamps, pre-decision proposal, final plan/status and human
+decision details. Even initial generation failures produce downloadable records. Invalid
+input forms do not create planning runs. Prior proposals are deep snapshots.
 
-Tests cover all decisions, invalid approval, stale request/plan detection, terminal
-states, required revision notes, UI acknowledgement, invalid-proposal rejection and
-revision, and decision reset on a new generation. The full suite uses mocked model calls.
+Credentials and raw provider error/response bodies are excluded. Mission text and review
+notes are included as entered; the exporter is not a general redaction service. Storage
+is session-local plus user-downloaded JSON. There is no automatic server database,
+identity authentication, tamper-evident storage or retention policy.
 
-## Phase 6 — Audit Layer
-
-Every run now has a `PlanningRunRecord` with a unique run ID, saved mission request,
-initial plan, ordered validation results, schema-valid revisions, all model-call outcomes,
-reviewable proposal, final plan/status and timestamps. Human review updates a new snapshot
-with decision, notes, proposal fingerprint and review time, preserving the proposal
-actually reviewed and all earlier plans.
-
-**Business value:** One download answers what was requested, what failed, what changed,
-and what the human decided. **Engineering behavior:** The engine captures snapshots at
-planning boundaries; `audit.py` validates review linkage and exports typed JSON that can
-be reloaded through `PlanningRunRecord.model_validate_json`.
-
-Call zero is initial generation; calls one and two are bounded revisions. Failed calls
-record fixed error codes and timestamps, never raw provider errors or response bodies.
-An initial generation failure produces a downloadable record with no final plan and a
-human-review status. An invalid mission-input form does not create a planning run.
-Credentials are not passed to the audit layer. User-entered mission and review text is
-included as provided; this is not a general-purpose redaction service.
-
-Use **Download Complete Audit JSON** to save the record before starting another run or
-ending the session. Storage is session-local plus user-downloaded JSON, not automatic
-server-side persistence. Authenticated identities, tamper-evident storage, retention
-policies and a database remain production extensions. Phase 7 adds the evaluation package described below.
-No live-model evaluation or Hugging Face deployment has been performed.
-
-
-## Phase 7 — Repeatable Evaluation
-
-The offline evaluation package meets the design's minimum case counts: **10 success,
-5 edge, 7 failure and 3 adversarial proposals**. All 25 expected outcomes matched;
-all 32 regression tests passed. Invalid proposals are expected to be rejected.
-
-**Business value:** Make supported behavior and remaining limits reviewable with evidence.
-**Engineering value:** Repeatable fixtures, per-case JSON results and nonzero failure exits
-catch regressions without model costs. GitHub Actions runs tests and evaluation on pushes
-and pull requests, then uploads the scorecard.
+## Evaluation evidence
 
 ```bash
 python -m unittest discover -s tests -v
 python -m evaluation.run --output evaluation/scorecard.json
 ```
 
-See [evaluation coverage](evaluation/README.md) and the [scorecard](evaluation/scorecard.json)
-for expected/actual results and the full design-dimension mapping. Workflow tests cover
-bounded replanning, human decisions and audit completeness. Semantic constraint adherence,
-resource scheduling, milestone quality, factual completeness and live-model resistance to
-prompt injection remain unmeasured. The results establish deterministic behavior, not
-operational safety or live-model quality.
+**25/25 expected scenario outcomes:** 10 success, 5 edge, 7 failure and 3 adversarial.
+**32 regression tests** cover planning, review, audit and Streamlit behavior. CI runs both
+commands and uploads a scorecard. Invalid proposals are expected to be rejected.
 
-Remaining roadmap: Phase 8 UI refinement and Phase 9 consolidated portfolio/documentation
-review. The existing interface already exposes validation, retries, decisions and audit
-exports. The Hugging Face Space has not been redeployed.
+See [coverage and limitations](evaluation/README.md) and the [JSON scorecard](evaluation/scorecard.json).
+These are synthetic deterministic checks and mocked model workflows, not live-model quality,
+operational safety or measured business outcomes. The adversarial fixtures test rule enforcement
+against hostile proposals, not model resistance to hostile instructions.
+
+## Upgrade and deployment status
+
+The repository implements Phases 1–9 of [DESIGN.md](DESIGN.md): typed contracts, structured
+planning, graph validation, bounded revisions, human decisions, audit export, offline
+evaluation, UI organization and this consolidated portfolio documentation. Historical phase
+notes in the design describe the incremental implementation; this README describes current behavior.
+
+The Hugging Face Space has **not** been redeployed during this upgrade. A future deployment
+must include every root Python module and `requirements.txt`, followed by a smoke test with
+the configured provider. GitHub CI is verification only; it does not deploy the Space.
+
+Production extensions include authenticated review, durable protected audit storage,
+structured constraints and scheduling, live-model evaluation with qualified reviewers,
+provider timeouts/retry policies, dependency pinning and deployment validation.

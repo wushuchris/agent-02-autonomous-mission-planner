@@ -105,6 +105,8 @@ with st.sidebar:
     )
 
 
+st.subheader("1. Describe the Mission")
+st.caption("Generate a proposal, review its findings and saved inputs, then record your decision. Save the audit before starting another run.")
 col1, col2 = st.columns(2)
 
 with col1:
@@ -240,9 +242,73 @@ if "mission_plan" in st.session_state:
     mission_request = st.session_state["mission_request"]
     validation = st.session_state["validation_result"]
     outcome = st.session_state["planning_outcome"]
+    plan_markdown = plan_to_markdown(plan)
+    if "review_decision" in st.session_state:
+        record = st.session_state["review_decision"]
+        plan_markdown += f"\n\n## Human Review\nDecision: {record.decision.value}\nNotes: {record.notes}\nRecorded at: {record.decided_at.isoformat()}\nAdvisory review only; no operational authorization.\n"
+
+    plan_markdown += f"\n\nReplanning attempts: {outcome.replan_count} / 2\n{outcome.stopped_reason}\n"
+    plan_markdown += "\n\n## Deterministic Validation\n"
+    plan_markdown += "PASS" if validation.valid else "FAIL — proposal requires correction"
+    plan_markdown += "\n" + "\n".join(f"- {item}" for item in validation.errors + validation.warnings)
+    plan_json = plan.model_dump_json(indent=2)
+
+    st.divider()
+    st.subheader("2. Review the Proposal")
+    st.caption(f"Saved mission: {mission_request.mission_id} · Run: {st.session_state['audit_record'].run_id}")
+    with st.expander("Saved Mission Inputs", expanded=True):
+        st.write(mission_request.objective)
+        st.write(f"Search area: {mission_request.search_area}")
+        st.write(f"Environment: {mission_request.environment}")
+        st.write({"Available resources": mission_request.available_resources, "Sensors": mission_request.sensors,
+                  "Constraints": mission_request.constraints, "Approval rules": mission_request.approval_rules,
+                  "Success criteria": mission_request.success_criteria})
+
+    status_col, validation_col, mission_col = st.columns(3)
+    status_col.metric("Schema Status", "VALID")
+    validation_col.metric("Deterministic Checks", "PASS" if validation.valid else "FAIL")
+    mission_col.metric("Plan Status", plan.plan_status.value)
+
+    st.metric("Replanning Attempts", f"{outcome.replan_count} / 2")
+    if outcome.stopped_reason:
+        st.error(outcome.stopped_reason)
+    with st.expander("View Replanning Results"):
+        st.json([attempt.model_dump(mode="json") for attempt in outcome.attempts])
+        st.caption("Only schema-valid revisions have structured results. A failed service or output attempt is counted above and stops the run.")
+
+    st.success(
+        "The displayed proposal was successfully parsed into the MissionPlan Pydantic schema. "
+        "This confirms structure and types, not plan correctness."
+    )
+
+    if validation.valid and "review_decision" not in st.session_state:
+        st.info("Deterministic checks passed. This is an advisory proposal awaiting human review, not authorization to execute.")
+    elif not validation.valid:
+        st.error("Deterministic validation failed. This proposal must be corrected before use. Bounded replanning has stopped; human review is required.")
+    for error in validation.errors:
+        st.error(error)
+    with st.expander("Validation Limits and Review Warnings"):
+        for warning in validation.warnings:
+            st.warning(warning)
+    with st.expander("View Dependency Graph"):
+        graph = build_plan_graph(plan)
+        st.json({"dependencies": graph.dependencies, "topological_order": graph.topological_order, "errors": graph.errors})
+        st.caption("Dependencies list each task's prerequisites. The ordering is structural, not an execution schedule. Invalid graphs have no ordering.")
+    with st.expander("View Deterministic Validation JSON"):
+        st.json(validation.model_dump(mode="json"))
+    st.download_button("Download Validation JSON", validation.model_dump_json(indent=2),
+                       "plan_validation.json", "application/json")
+    st.markdown(plan_markdown)
+
+    with st.expander("View Structured Mission Request"):
+        st.json(mission_request.model_dump(mode="json"))
+
+    with st.expander("View Structured MissionPlan JSON"):
+        st.json(plan.model_dump(mode="json"))
+
     if "review_decision" not in st.session_state:
-        st.subheader("Human Review")
-        st.caption("This decision applies to the generated proposal and its saved mission request below. Editing the form does not revise that proposal. Approval records review of an advisory plan only; it does not authorize real-world execution.")
+        st.subheader("3. Record Your Decision")
+        st.caption("This decision applies to the generated proposal and its saved mission request above. Editing the form does not revise that proposal. Approval records review of an advisory plan only; it does not authorize real-world execution.")
         notes = st.text_area("Review notes / requested changes", key="review_notes")
         acknowledged = st.checkbox("I have reviewed this proposal, its saved mission request, and the validation findings.", key="review_ack")
         fingerprint = proposal_fingerprint(mission_request, plan)
@@ -272,61 +338,8 @@ if "mission_plan" in st.session_state:
         with st.expander("Human Review Record"):
             st.json(record.model_dump(mode="json"))
         st.download_button("Download Review Decision", record.model_dump_json(indent=2), "review_decision.json", "application/json")
-    plan_markdown = plan_to_markdown(plan)
-    if "review_decision" in st.session_state:
-        record = st.session_state["review_decision"]
-        plan_markdown += f"\n\n## Human Review\nDecision: {record.decision.value}\nNotes: {record.notes}\nRecorded at: {record.decided_at.isoformat()}\nAdvisory review only; no operational authorization.\n"
 
-    plan_markdown += f"\n\nReplanning attempts: {outcome.replan_count} / 2\n{outcome.stopped_reason}\n"
-    plan_markdown += "\n\n## Deterministic Validation\n"
-    plan_markdown += "PASS" if validation.valid else "FAIL — proposal requires correction"
-    plan_markdown += "\n" + "\n".join(f"- {item}" for item in validation.errors + validation.warnings)
-    plan_json = plan.model_dump_json(indent=2)
-
-    st.divider()
-    st.subheader("Generated Search and Rescue Mission Plan")
-
-    status_col, validation_col, mission_col = st.columns(3)
-    status_col.metric("Schema Status", "VALID")
-    validation_col.metric("Deterministic Checks", "PASS" if validation.valid else "FAIL")
-    mission_col.metric("Plan Status", plan.plan_status.value)
-
-    st.metric("Replanning Attempts", f"{outcome.replan_count} / 2")
-    if outcome.stopped_reason:
-        st.error(outcome.stopped_reason)
-    with st.expander("View Replanning Results"):
-        st.json([attempt.model_dump(mode="json") for attempt in outcome.attempts])
-        st.caption("Only schema-valid revisions have structured results. A failed service or output attempt is counted above and stops the run.")
-
-    st.success(
-        "The displayed proposal was successfully parsed into the MissionPlan Pydantic schema. "
-        "This confirms structure and types, not plan correctness."
-    )
-
-    if validation.valid and "review_decision" not in st.session_state:
-        st.info("Deterministic checks passed. This is an advisory proposal awaiting human review, not authorization to execute.")
-    elif not validation.valid:
-        st.error("Deterministic validation failed. This proposal must be corrected before use. Bounded replanning has stopped; human review is required.")
-    for error in validation.errors:
-        st.error(error)
-    for warning in validation.warnings:
-        st.warning(warning)
-    with st.expander("View Dependency Graph"):
-        graph = build_plan_graph(plan)
-        st.json({"dependencies": graph.dependencies, "topological_order": graph.topological_order, "errors": graph.errors})
-        st.caption("Dependencies list each task's prerequisites. The ordering is structural, not an execution schedule. Invalid graphs have no ordering.")
-    with st.expander("View Deterministic Validation JSON"):
-        st.json(validation.model_dump(mode="json"))
-    st.download_button("Download Validation JSON", validation.model_dump_json(indent=2),
-                       "plan_validation.json", "application/json")
-    st.markdown(plan_markdown)
-
-    with st.expander("View Structured Mission Request"):
-        st.json(mission_request.model_dump(mode="json"))
-
-    with st.expander("View Structured MissionPlan JSON"):
-        st.json(plan.model_dump(mode="json"))
-
+    st.subheader("Save Your Plan")
     download_col1, download_col2 = st.columns(2)
 
     with download_col1:

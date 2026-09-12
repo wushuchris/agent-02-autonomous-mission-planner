@@ -604,3 +604,14 @@ workflow, review and audit behavior. CI runs both packages. `evaluation/README.m
 every design dimension to evidence or an explicit measurement limit. Semantic plan
 quality and live-model prompt-injection resistance remain unmeasured; fixture success
 must not be described as operational readiness. Phases 8 and 9 remain next.
+
+## Phases 8–9 Implementation Note
+
+The interface now follows mission input → saved request/proposal and validation evidence
+→ human decision → downloads. Review controls follow the proposal; warnings and detailed
+engineering data are expandable. Planning and approval policy are unchanged. The README
+now consolidates current business/engineering framing, architecture, setup, exact checks,
+failure behavior, audit limits, evaluation evidence and deployment status. Earlier phase
+notes are historical. The repository implementation is complete through Phase 9; live-model
+quality evaluation and Hugging Face redeployment remain separate work, and production
+limitations are explicitly documented rather than treated as resolved.
