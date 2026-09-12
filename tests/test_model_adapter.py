@@ -14,20 +14,28 @@ from planner import generate_structured_plan
 
 
 class FakeCompletions:
-    def __init__(self, content):
+    def __init__(self, content, finish_reason=None):
         self.content = content
+        self.finish_reason = finish_reason
         self.calls = []
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
         return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=self.content))]
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(content=self.content),
+                    finish_reason=self.finish_reason,
+                )
+            ]
         )
 
 
 class FakeOpenAIClient:
-    def __init__(self, content):
-        self.chat = SimpleNamespace(completions=FakeCompletions(content))
+    def __init__(self, content, finish_reason=None):
+        self.chat = SimpleNamespace(
+            completions=FakeCompletions(content, finish_reason=finish_reason)
+        )
 
 
 def request():
@@ -114,7 +122,21 @@ class ModelAdapterTests(unittest.TestCase):
         )
         content = client.complete_json(system_prompt="system", user_prompt="user")
         self.assertEqual(content, '{"ok": true}')
-        self.assertEqual(fake.chat.completions.calls[0]["model"], "model")
+        call = fake.chat.completions.calls[0]
+        self.assertEqual(call["model"], "model")
+        self.assertNotIn("reasoning_effort", call)
+
+    def test_qwen38_requests_low_reasoning(self):
+        fake = FakeOpenAIClient('{"ok": true}')
+        client = HuggingFaceChatClient(
+            model_id="Qwen/Qwen3.8-27B:ovhcloud",
+            token="test-token",
+            client=fake,
+        )
+        client.complete_json(system_prompt="system", user_prompt="user")
+        call = fake.chat.completions.calls[0]
+        self.assertEqual(call["reasoning_effort"], "low")
+        self.assertEqual(call["max_tokens"], 3600)
 
     def test_empty_response_fails_closed(self):
         client = HuggingFaceChatClient(
@@ -123,6 +145,15 @@ class ModelAdapterTests(unittest.TestCase):
             client=FakeOpenAIClient("   "),
         )
         with self.assertRaises(StructuredModelError):
+            client.complete_json(system_prompt="system", user_prompt="user")
+
+    def test_truncated_response_fails_closed(self):
+        client = HuggingFaceChatClient(
+            model_id="Qwen/Qwen3.8-27B:ovhcloud",
+            token="test-token",
+            client=FakeOpenAIClient("", finish_reason="length"),
+        )
+        with self.assertRaisesRegex(StructuredModelError, "truncated"):
             client.complete_json(system_prompt="system", user_prompt="user")
 
     def test_service_messages_are_sanitized(self):
