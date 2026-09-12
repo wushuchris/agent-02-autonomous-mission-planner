@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from models import MissionRequest, PlanningDepth
-from planner import PlannerOutputError, generate_structured_plan, plan_to_markdown
+from planner import PlannerOutputError, plan_to_markdown
 from plan_graph import build_plan_graph
-from validator import apply_validation_status, validate_plan
+from planning_engine import run_planning
 
 
 load_dotenv()
@@ -91,8 +91,8 @@ with st.sidebar:
     st.header("Engineering Pattern")
     st.write("**The LLM proposes. Rules validate. The agent replans. Humans approve.**")
     st.caption(
-        "Current upgrade stage: structured planning, schema validation and deterministic graph checks. "
-        "Bounded replanning and human decision capture remain future phases."
+        "Current upgrade stage: structured planning, schema validation, deterministic graph checks and bounded replanning. "
+        "Up to two revisions are allowed. Human decision capture remains a future phase."
     )
 
     st.header("Safety Boundary")
@@ -187,7 +187,7 @@ planning_depth = st.selectbox(
 generate_button = st.button("Generate Structured Search and Rescue Plan", type="primary")
 
 if generate_button:
-    for key in ("mission_plan", "mission_request", "validation_result"):
+    for key in ("mission_plan", "mission_request", "validation_result", "planning_outcome"):
         st.session_state.pop(key, None)
     try:
         mission_request = build_mission_request(
@@ -202,14 +202,15 @@ if generate_button:
             planning_depth=planning_depth,
         )
 
-        with st.spinner("Generating structured search and rescue plan..."):
-            plan = generate_structured_plan(
+        with st.spinner("Generating and validating a plan (up to two revisions)..."):
+            outcome = run_planning(
                 mission_request=mission_request,
                 hf_token=get_hf_token(),
             )
 
-        validation = validate_plan(mission_request, plan)
-        plan = apply_validation_status(plan, validation)
+        plan = outcome.plan
+        validation = outcome.validation
+        st.session_state["planning_outcome"] = outcome
         st.session_state["validation_result"] = validation
         st.session_state["mission_request"] = mission_request
         st.session_state["mission_plan"] = plan
@@ -234,7 +235,9 @@ if "mission_plan" in st.session_state:
     plan = st.session_state["mission_plan"]
     mission_request = st.session_state["mission_request"]
     validation = st.session_state["validation_result"]
+    outcome = st.session_state["planning_outcome"]
     plan_markdown = plan_to_markdown(plan)
+    plan_markdown += f"\n\nReplanning attempts: {outcome.replan_count} / 2\n{outcome.stopped_reason}\n"
     plan_markdown += "\n\n## Deterministic Validation\n"
     plan_markdown += "PASS" if validation.valid else "FAIL — proposal requires correction"
     plan_markdown += "\n" + "\n".join(f"- {item}" for item in validation.errors + validation.warnings)
@@ -248,15 +251,22 @@ if "mission_plan" in st.session_state:
     validation_col.metric("Deterministic Checks", "PASS" if validation.valid else "FAIL")
     mission_col.metric("Plan Status", plan.plan_status.value)
 
+    st.metric("Replanning Attempts", f"{outcome.replan_count} / 2")
+    if outcome.stopped_reason:
+        st.error(outcome.stopped_reason)
+    with st.expander("View Replanning Results"):
+        st.json([attempt.model_dump(mode="json") for attempt in outcome.attempts])
+        st.caption("Only schema-valid revisions have structured results. A failed service or output attempt is counted above and stops the run.")
+
     st.success(
-        "The model output was successfully parsed into the MissionPlan Pydantic schema. "
+        "The displayed proposal was successfully parsed into the MissionPlan Pydantic schema. "
         "This confirms structure and types, not plan correctness."
     )
 
     if validation.valid:
         st.info("Deterministic checks passed. This is an advisory proposal awaiting human review, not authorization to execute.")
     else:
-        st.error("Deterministic validation failed. This proposal must be corrected before use. Automatic replanning is not implemented.")
+        st.error("Deterministic validation failed. This proposal must be corrected before use. Bounded replanning has stopped; human review is required.")
     for error in validation.errors:
         st.error(error)
     for warning in validation.warnings:
