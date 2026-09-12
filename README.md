@@ -167,7 +167,7 @@ The limit bounds planner calls; it is not a wall-clock or provider-internal retr
 Streamlit shows the number of revisions, each schema-valid revision's validation
 result, and any stop reason. The displayed proposal's schema status is separate from
 its deterministic validity. Markdown exports include the count and stop reason.
-The lightweight in-memory outcome is not the full Phase 6 audit record; malformed
+The outcome now carries the Phase 6 audit record; malformed
 responses and service failures have no structured plan to include in revision history.
 
 The tests include no-retry success, repair on either revision, exhausted retries,
@@ -198,15 +198,35 @@ state and downloadable as review JSON. Markdown includes the human disposition, 
 plan JSON includes the resulting status. These are prototype session decisions, not
 identity-authenticated approvals. The fingerprint detects changed content; it does not
 prove identity or prevent a trusted caller from fabricating a decision. Session loss
-loses the record unless downloaded. Complete durable audit records remain Phase 6.
+loses the record unless downloaded. Phase 6 adds a complete run export; server-side persistence is not enabled.
 
 Tests cover all decisions, invalid approval, stale request/plan detection, terminal
 states, required revision notes, UI acknowledgement, invalid-proposal rejection and
 revision, and decision reset on a new generation. The full suite uses mocked model calls.
 
-### Next: Phase 6 — Audit Layer
+## Phase 6 — Audit Layer
 
-Capture the original request, initial plan, all validation and revision results, final
-proposal and human decision as one complete planning-run record with export/persistence.
-The full evaluation package remains Phase 7. Phase 3's constraint, scheduling and safety
-limitations still apply. The Hugging Face Space has not been redeployed.
+Every run now has a `PlanningRunRecord` with a unique run ID, saved mission request,
+initial plan, ordered validation results, schema-valid revisions, all model-call outcomes,
+reviewable proposal, final plan/status and timestamps. Human review updates a new snapshot
+with decision, notes, proposal fingerprint and review time, preserving the proposal
+actually reviewed and all earlier plans.
+
+**Business value:** One download answers what was requested, what failed, what changed,
+and what the human decided. **Engineering behavior:** The engine captures snapshots at
+planning boundaries; `audit.py` validates review linkage and exports typed JSON that can
+be reloaded through `PlanningRunRecord.model_validate_json`.
+
+Call zero is initial generation; calls one and two are bounded revisions. Failed calls
+record fixed error codes and timestamps, never raw provider errors or response bodies.
+An initial generation failure produces a downloadable record with no final plan and a
+human-review status. An invalid mission-input form does not create a planning run.
+Credentials are not passed to the audit layer. User-entered mission and review text is
+included as provided; this is not a general-purpose redaction service.
+
+Use **Download Complete Audit JSON** to save the record before starting another run or
+ending the session. Storage is session-local plus user-downloaded JSON, not automatic
+server-side persistence. Authenticated identities, tamper-evident storage, retention
+policies and a database remain production extensions. The full Phase 7 evaluation
+package remains pending; the focused regression suite now contains 30 passing tests.
+No live-model evaluation or Hugging Face deployment has been performed.

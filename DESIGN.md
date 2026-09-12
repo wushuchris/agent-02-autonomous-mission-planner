@@ -584,3 +584,14 @@ the previous decision. Revision requests require manual input changes and a fres
 not an automatic model call. Session review records include decision, notes, timestamp
 and fingerprint; they do not authenticate the reviewer or authorize real-world execution.
 Phase 6 remains responsible for complete planning-run audit records and persistence.
+
+## Phase 6 Implementation Note
+
+The planning engine now fills `PlanningRunRecord` from initial generation through
+validation, revisions and final disposition. All model calls, including malformed or
+failed calls, have timestamps and fixed outcome/error codes. Human review retains the
+pre-decision snapshot and final decision details. Streamlit exports the complete JSON
+record even when initial generation fails. Raw provider errors and credentials are not
+captured. Persistence is by user download; automated server-side storage and authenticated
+reviewer identities remain production extensions. Phase 7's full evaluation package is
+still pending, distinct from the 30 focused regression tests delivered through Phase 6.
