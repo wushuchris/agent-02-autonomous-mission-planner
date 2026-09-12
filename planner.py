@@ -4,6 +4,7 @@ import json
 from typing import Final
 
 from huggingface_hub import InferenceClient
+from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 from pydantic import ValidationError
 
 from models import MissionPlan, MissionRequest, PlanStatus, ValidationResult
@@ -14,6 +15,23 @@ DEFAULT_MODEL: Final[str] = "Qwen/Qwen2.5-7B-Instruct"
 
 class PlannerOutputError(RuntimeError):
     """Raised when the model response cannot be converted into a valid MissionPlan."""
+
+
+class PlannerServiceError(RuntimeError):
+    """Fixed public message; no raw provider error or credentials."""
+
+
+def service_error(exc: Exception) -> PlannerServiceError:
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    messages = {
+        401: "Inference authentication failed. Check the HF_TOKEN secret in the Hugging Face Space.",
+        403: "Inference access was denied. The Space token needs permission to call Inference Providers.",
+        402: "The inference provider requires available credits or billing. Check the Hugging Face account billing settings.",
+        429: "The inference provider rate limit was reached. Try again later.",
+        400: "The inference provider rejected the request format or parameters (HTTP 400).",
+        404: "The configured model or provider endpoint was not found (HTTP 404).",
+    }
+    return PlannerServiceError(messages.get(status, "The inference provider is unavailable or failed to respond. Try again later."))
 
 
 def build_structured_prompt(mission_request: MissionRequest) -> str:
@@ -119,21 +137,25 @@ def generate_structured_plan(
                               "validation_feedback": validation_feedback.model_dump(mode="json")},
                              ensure_ascii=False)
 
-    response = client.chat_completion(
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a careful, safety-focused search and rescue planning assistant. "
-                    "Return only schema-conforming JSON. Support humanitarian planning only. "
-                    "Do not provide harmful, weaponized, targeting, attack, evasion, or tactical engagement guidance."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=2200,
-        temperature=0.2,
-    )
+    try:
+        response = client.chat_completion(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a careful, safety-focused search and rescue planning assistant. "
+                        "Return only schema-conforming JSON. Support humanitarian planning only. "
+                        "Do not provide harmful, weaponized, targeting, attack, evasion, or tactical engagement guidance."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=2200,
+            temperature=0.2,
+        )
+    except (HfHubHTTPError, InferenceTimeoutError) as exc:
+        raise service_error(exc) from None
+
 
     raw_content = response.choices[0].message.content
     if not raw_content:

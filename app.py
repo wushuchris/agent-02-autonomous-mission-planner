@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from models import HumanDecision, MissionRequest, PlanningDepth
 from approval import decide_proposal, proposal_fingerprint
-from planner import PlannerOutputError, plan_to_markdown
+from planner import PlannerOutputError, PlannerServiceError, plan_to_markdown
 from plan_graph import build_plan_graph
 from planning_engine import run_planning
 from audit import new_run, record_decision, export_run
@@ -224,6 +224,9 @@ if generate_button:
     except ValidationError as exc:
         st.error("The mission request did not satisfy the planning input schema.")
         st.code(str(exc))
+    except PlannerServiceError as exc:
+        st.error(str(exc))
+        st.info("No plan was accepted. The failed run remains available in the audit download.")
     except PlannerOutputError as exc:
         st.error(str(exc))
         st.info(
