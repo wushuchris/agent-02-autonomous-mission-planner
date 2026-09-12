@@ -64,14 +64,17 @@ class HuggingFaceChatClient:
 
     The planning engine depends on the JsonChatModel contract rather than a provider SDK.
     Credentials and model selection come from runtime configuration, not source code.
+    When a response schema is supplied, the provider is asked to enforce that JSON
+    shape in addition to the application's own Pydantic validation.
     """
 
     model_id: str
     token: str
     base_url: str = HF_DEFAULT_BASE_URL
     temperature: float = 0.2
-    max_tokens: int = 3600
+    max_tokens: int = 5000
     timeout_seconds: float = 120.0
+    response_schema: dict[str, Any] | None = None
     client: Any | None = None
 
     @classmethod
@@ -81,6 +84,7 @@ class HuggingFaceChatClient:
         token: str | None = None,
         model_id: str | None = None,
         base_url: str | None = None,
+        response_schema: dict[str, Any] | None = None,
         env: Mapping[str, str] | None = None,
     ) -> "HuggingFaceChatClient":
         values = env if env is not None else os.environ
@@ -99,6 +103,7 @@ class HuggingFaceChatClient:
             model_id=resolved_model,
             token=resolved_token,
             base_url=resolved_base_url,
+            response_schema=response_schema,
         )
 
     @property
@@ -133,6 +138,16 @@ class HuggingFaceChatClient:
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
         }
+        if self.response_schema is not None:
+            schema_name = str(self.response_schema.get("title") or "StructuredResponse")
+            request["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema_name,
+                    "schema": self.response_schema,
+                    "strict": True,
+                },
+            }
         if _uses_low_reasoning(self.model_id):
             # Qwen3.8 can otherwise spend the bounded completion budget on hidden
             # reasoning before emitting the visible JSON object. This is the same
