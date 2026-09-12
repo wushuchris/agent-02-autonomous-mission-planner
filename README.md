@@ -121,7 +121,7 @@ MissionRequest → structured planner → MissionPlan schema check
   The app shows schema validity separately from deterministic validity, structured
   graph details, errors and limitations. After Phase 4 exhaustion, failed proposals become `REQUIRES_HUMAN_REVIEW`;
   passing proposals become `AWAITING_HUMAN_APPROVAL` when gated, otherwise
-  `REQUIRES_HUMAN_REVIEW`. No proposal becomes approved. Markdown and plan JSON retain
+  `REQUIRES_HUMAN_REVIEW`. The planner and validator never approve a proposal; Phase 5 records an explicit human review decision. Markdown and plan JSON retain
   that status; a separate validation JSON download exposes all findings.
 
 The validator does not prove real-world safety, interpret arbitrary natural-language
@@ -174,8 +174,39 @@ The tests include no-retry success, repair on either revision, exhausted retries
 latest-feedback propagation, schema/identity rejection and safe service-error handling.
 Model calls are mocked; no live model quality evaluation or Space deployment is included.
 
-### Next: Phase 5 — Human Approval State Machine
+## Phase 5 — Human Approval State Machine
 
-Add explicit approve/reject/request-revision controls backed by trusted human decisions.
-Complete audit records and exports remain Phase 6; the full evaluation package remains
-Phase 7. Phase 3's documented constraint, scheduling and safety limitations still apply.
+The app now offers approve, reject and request-revision controls for the displayed
+proposal and its saved mission request. Approval requires review acknowledgement and
+passing deterministic validation; `approval.decide_proposal` independently revalidates
+before approval. Rejection is available for invalid proposals. Revision requires notes
+and moves the plan to the additive `REVISION_REQUESTED` status.
+
+**Business value:** Make the human disposition explicit instead of leaving review as
+prose. **Engineering behavior:** A separate transition function accepts decisions only
+from reviewable states and checks a fingerprint of the saved request and proposal.
+Final decisions cannot be overwritten; a new generation clears the decision and review
+acknowledgement. Task states stay unchanged. Approval is advisory review, never an
+execution command or replacement for operational authorization.
+
+Requesting revision does not call the LLM automatically: the user edits mission inputs
+using their notes and generates a fresh proposal under the same two-retry budget.
+Editing input fields alone does not change the saved proposal being reviewed.
+
+Decision, notes, timestamp and proposal fingerprint are retained in Streamlit session
+state and downloadable as review JSON. Markdown includes the human disposition, and
+plan JSON includes the resulting status. These are prototype session decisions, not
+identity-authenticated approvals. The fingerprint detects changed content; it does not
+prove identity or prevent a trusted caller from fabricating a decision. Session loss
+loses the record unless downloaded. Complete durable audit records remain Phase 6.
+
+Tests cover all decisions, invalid approval, stale request/plan detection, terminal
+states, required revision notes, UI acknowledgement, invalid-proposal rejection and
+revision, and decision reset on a new generation. The full suite uses mocked model calls.
+
+### Next: Phase 6 — Audit Layer
+
+Capture the original request, initial plan, all validation and revision results, final
+proposal and human decision as one complete planning-run record with export/persistence.
+The full evaluation package remains Phase 7. Phase 3's constraint, scheduling and safety
+limitations still apply. The Hugging Face Space has not been redeployed.

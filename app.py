@@ -6,7 +6,8 @@ import streamlit as st
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
-from models import MissionRequest, PlanningDepth
+from models import HumanDecision, MissionRequest, PlanningDepth
+from approval import decide_proposal, proposal_fingerprint
 from planner import PlannerOutputError, plan_to_markdown
 from plan_graph import build_plan_graph
 from planning_engine import run_planning
@@ -92,7 +93,7 @@ with st.sidebar:
     st.write("**The LLM proposes. Rules validate. The agent replans. Humans approve.**")
     st.caption(
         "Current upgrade stage: structured planning, schema validation, deterministic graph checks and bounded replanning. "
-        "Up to two revisions are allowed. Human decision capture remains a future phase."
+        "Up to two revisions are allowed, followed by an explicit human review decision."
     )
 
     st.header("Safety Boundary")
@@ -187,7 +188,7 @@ planning_depth = st.selectbox(
 generate_button = st.button("Generate Structured Search and Rescue Plan", type="primary")
 
 if generate_button:
-    for key in ("mission_plan", "mission_request", "validation_result", "planning_outcome"):
+    for key in ("mission_plan", "mission_request", "validation_result", "planning_outcome", "review_decision", "review_notes", "review_ack"):
         st.session_state.pop(key, None)
     try:
         mission_request = build_mission_request(
@@ -236,7 +237,41 @@ if "mission_plan" in st.session_state:
     mission_request = st.session_state["mission_request"]
     validation = st.session_state["validation_result"]
     outcome = st.session_state["planning_outcome"]
+    if "review_decision" not in st.session_state:
+        st.subheader("Human Review")
+        st.caption("This decision applies to the generated proposal and its saved mission request below. Editing the form does not revise that proposal. Approval records review of an advisory plan only; it does not authorize real-world execution.")
+        notes = st.text_area("Review notes / requested changes", key="review_notes")
+        acknowledged = st.checkbox("I have reviewed this proposal, its saved mission request, and the validation findings.", key="review_ack")
+        fingerprint = proposal_fingerprint(mission_request, plan)
+        approve_col, reject_col, revise_col = st.columns(3)
+        choice = None
+        if approve_col.button("Approve advisory plan", disabled=not validation.valid or not acknowledged):
+            choice = HumanDecision.APPROVED
+        if reject_col.button("Reject proposal"):
+            choice = HumanDecision.REJECTED
+        if revise_col.button("Request revision", disabled=not notes.strip()):
+            choice = HumanDecision.REVISION_REQUESTED
+        if choice is not None:
+            try:
+                plan, record = decide_proposal(mission_request, plan, choice, fingerprint, notes)
+                st.session_state["mission_plan"] = plan
+                st.session_state["review_decision"] = record
+                st.rerun()
+            except ValueError as exc:
+                st.error(str(exc))
+    else:
+        record = st.session_state["review_decision"]
+        st.info(f"Human decision: {record.decision.value}. This is an advisory planning record, not operational authorization.")
+        if record.decision == HumanDecision.REVISION_REQUESTED:
+            st.info("Update the mission inputs using your review notes, then generate a new proposal. It will require a new review; requesting revision does not call the model automatically.")
+        with st.expander("Human Review Record"):
+            st.json(record.model_dump(mode="json"))
+        st.download_button("Download Review Decision", record.model_dump_json(indent=2), "review_decision.json", "application/json")
     plan_markdown = plan_to_markdown(plan)
+    if "review_decision" in st.session_state:
+        record = st.session_state["review_decision"]
+        plan_markdown += f"\n\n## Human Review\nDecision: {record.decision.value}\nNotes: {record.notes}\nRecorded at: {record.decided_at.isoformat()}\nAdvisory review only; no operational authorization.\n"
+
     plan_markdown += f"\n\nReplanning attempts: {outcome.replan_count} / 2\n{outcome.stopped_reason}\n"
     plan_markdown += "\n\n## Deterministic Validation\n"
     plan_markdown += "PASS" if validation.valid else "FAIL — proposal requires correction"
@@ -263,9 +298,9 @@ if "mission_plan" in st.session_state:
         "This confirms structure and types, not plan correctness."
     )
 
-    if validation.valid:
+    if validation.valid and "review_decision" not in st.session_state:
         st.info("Deterministic checks passed. This is an advisory proposal awaiting human review, not authorization to execute.")
-    else:
+    elif not validation.valid:
         st.error("Deterministic validation failed. This proposal must be corrected before use. Bounded replanning has stopped; human review is required.")
     for error in validation.errors:
         st.error(error)
