@@ -18,6 +18,7 @@ from typing import Any, Callable
 
 from dotenv import load_dotenv
 
+from model_adapter import ModelConfigurationError, ModelServiceError
 from models import MissionRequest, PlanStatus
 from planner import PlannerOutputError
 from planning_engine import PlanningOutcome, run_planning
@@ -142,6 +143,12 @@ def evaluate_scenario(
     except PlannerOutputError as exc:
         result["error_code"] = "PLANNER_OUTPUT_ERROR"
         result["error_message"] = str(exc)
+    except ModelConfigurationError as exc:
+        result["error_code"] = "MODEL_CONFIGURATION_ERROR"
+        result["error_message"] = str(exc)
+    except ModelServiceError as exc:
+        result["error_code"] = "MODEL_SERVICE_ERROR"
+        result["error_message"] = str(exc)
     except Exception:
         result["error_code"] = "PLANNING_SERVICE_ERROR"
         result["error_message"] = (
@@ -207,6 +214,8 @@ def run_benchmark(
             f"first_pass={result['first_pass_validation']} | replans={result['replan_count']} | "
             f"latency={result['latency_seconds']}s"
         )
+        if result["error_code"]:
+            print(f"  {result['error_code']}: {result['error_message']}")
 
     return {
         "benchmark_version": 1,
