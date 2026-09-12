@@ -560,4 +560,16 @@ which makes representation mechanically checkable without claiming semantic comp
 Resource capacity/scheduling and approval gate applicability/timing remain human-review
 limitations of the existing text-based contract. Approval rules conservatively gate all
 tasks, and high/critical risk tasks require approval. No trusted approval is recorded yet.
-Phase 4 bounded replanning, Phase 5 human decisions and Phase 6 audit logging remain pending.
+Phase 4 bounded replanning is implemented below. Phase 5 human decisions and Phase 6 audit logging remain pending.
+
+## Phase 4 Implementation Note
+
+`planning_engine.py` permits two revisions after a deterministically invalid initial
+proposal and passes the latest plan and structured validation feedback to the existing
+planner. Every schema-valid revision is deterministically validated. Success stops
+replanning; exhaustion escalates the invalid proposal to `REQUIRES_HUMAN_REVIEW`.
+Malformed revision output or provider failure stops early with the last invalid
+proposal retained for review. Initial generation errors still fail closed without
+retries. Streamlit exposes attempt counts, revision results and the reason for stopping.
+No human approval is inferred and no execution is enabled. Full audit persistence,
+trusted human decision capture and provider resilience remain outside this phase.

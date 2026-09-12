@@ -89,7 +89,7 @@ This project is for educational and portfolio purposes. It is not a production e
 broken dependencies, unavailable resources, missing constraint coverage and approval requirements.
 
 **Engineering case:** Separate the LLM proposal from repeatable checks that run without
-an LLM or Streamlit. The current pipeline is:
+an LLM or Streamlit. The Phase 3 foundation is:
 
 ```text
 MissionRequest → structured planner → MissionPlan schema check
@@ -117,8 +117,9 @@ MissionRequest → structured planner → MissionPlan schema check
   require approval. Sensitive tasks need a nonblank gate and must stay `planned` or
   `blocked`; `ready`, `in_progress`, `complete` and a plan claiming `APPROVED` cannot be
   accepted without trusted approval evidence. Phase 3 has no approval-record input.
-- The app shows schema validity separately from deterministic validity, structured
-  graph details, errors and limitations. Failed proposals become `VALIDATION_FAILED`;
+- The Phase 3 validator reports failures as `VALIDATION_FAILED` before the Phase 4 retry loop.
+  The app shows schema validity separately from deterministic validity, structured
+  graph details, errors and limitations. After Phase 4 exhaustion, failed proposals become `REQUIRES_HUMAN_REVIEW`;
   passing proposals become `AWAITING_HUMAN_APPROVAL` when gated, otherwise
   `REQUIRES_HUMAN_REVIEW`. No proposal becomes approved. Markdown and plan JSON retain
   that status; a separate validation JSON download exposes all findings.
@@ -142,13 +143,39 @@ constraint representation, approval policy, status handling and Streamlit pass/f
 behavior. Model calls in app tests are mocked; they require no token or network access.
 This is Phase 3 regression coverage, not the full Phase 7 evaluation package.
 
-### Next: Phase 4 — Bounded Replanning
+## Phase 4 — Bounded Replanning
 
-Feed structured validation errors back to the planner, allow at most **two replan
-attempts**, validate each revised proposal, stop on success and escalate exhausted
-attempts to `REQUIRES_HUMAN_REVIEW`. `replan_required` currently records the need for
-correction; it does not trigger any retry. Human approve/reject/revise controls remain
-Phase 5, and complete audit records remain Phase 6.
+`planning_engine.run_planning` now wraps the existing planner and validator. After
+an invalid proposal it sends the original request, latest proposal and structured
+validation feedback to the planner. It permits at most **two replan attempts**
+(three planner calls total), validates every returned proposal and stops on success.
+Passing plans still await human approval or review; no run authorizes execution.
 
-The humanitarian safety boundary and existing structured planner are preserved.
-This repository upgrade does not redeploy the Hugging Face Space.
+**Business value:** Correct mechanically detectable omissions automatically while
+keeping a clear limit on model usage and preserving human review for unresolved failures.
+**Engineering behavior:** Retry control is deterministic and independent of the LLM
+and Streamlit. Previous proposals and feedback are serialized as untrusted JSON data;
+the existing humanitarian rules, schema check and mission identity check still apply.
+
+If both revisions fail validation, the final invalid proposal is labeled
+`REQUIRES_HUMAN_REVIEW`. If a revision fails schema/identity checks or the provider
+fails, the loop stops early and retains the last invalid proposal with the same
+review status and a visible explanation. Initial generation errors still fail closed
+without retries. Provider error details are not shown or saved in the outcome.
+The limit bounds planner calls; it is not a wall-clock or provider-internal retry budget.
+
+Streamlit shows the number of revisions, each schema-valid revision's validation
+result, and any stop reason. The displayed proposal's schema status is separate from
+its deterministic validity. Markdown exports include the count and stop reason.
+The lightweight in-memory outcome is not the full Phase 6 audit record; malformed
+responses and service failures have no structured plan to include in revision history.
+
+The tests include no-retry success, repair on either revision, exhausted retries,
+latest-feedback propagation, schema/identity rejection and safe service-error handling.
+Model calls are mocked; no live model quality evaluation or Space deployment is included.
+
+### Next: Phase 5 — Human Approval State Machine
+
+Add explicit approve/reject/request-revision controls backed by trusted human decisions.
+Complete audit records and exports remain Phase 6; the full evaluation package remains
+Phase 7. Phase 3's documented constraint, scheduling and safety limitations still apply.

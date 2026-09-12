@@ -130,7 +130,7 @@ class AppTests(unittest.TestCase):
             app.button[0].click().run()
         self.assertFalse(app.exception)
         self.assertEqual([metric.value for metric in app.metric][:2], ["VALID", "FAIL"])
-        self.assertEqual(app.session_state["mission_plan"].plan_status, PlanStatus.VALIDATION_FAILED)
+        self.assertEqual(app.session_state["mission_plan"].plan_status, PlanStatus.REQUIRES_HUMAN_REVIEW)
         with patch("planner.generate_structured_plan", side_effect=PlannerOutputError("Malformed output")):
             app.button[0].click().run()
         self.assertFalse(app.exception)
