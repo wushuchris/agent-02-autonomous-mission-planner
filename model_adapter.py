@@ -66,21 +66,27 @@ class HuggingFaceChatClient:
         cls,
         *,
         token: str | None = None,
+        model_id: str | None = None,
+        base_url: str | None = None,
         env: Mapping[str, str] | None = None,
     ) -> "HuggingFaceChatClient":
         values = env if env is not None else os.environ
         resolved_token = (token or values.get("HF_TOKEN", "")).strip()
-        model_id = values.get("MODEL_ID", "").strip()
-        base_url = values.get("HF_BASE_URL", HF_DEFAULT_BASE_URL).strip()
+        resolved_model = (model_id or values.get("MODEL_ID", "")).strip()
+        resolved_base_url = (base_url or values.get("HF_BASE_URL", HF_DEFAULT_BASE_URL)).strip()
 
         if not resolved_token or resolved_token in {"your_runtime_token", "<space-secret>"}:
             raise ModelConfigurationError("HF_TOKEN is required for live inference.")
-        if not model_id or model_id in {"your_model_id", "<hugging-face-provider-model-id>"}:
+        if not resolved_model or resolved_model in {"your_model_id", "<hugging-face-provider-model-id>"}:
             raise ModelConfigurationError("MODEL_ID is required for live inference.")
-        if not base_url.startswith("https://"):
+        if not resolved_base_url.startswith("https://"):
             raise ModelConfigurationError("HF_BASE_URL must use https.")
 
-        return cls(model_id=model_id, token=resolved_token, base_url=base_url)
+        return cls(
+            model_id=resolved_model,
+            token=resolved_token,
+            base_url=resolved_base_url,
+        )
 
     @property
     def provider_label(self) -> str:
