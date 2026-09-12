@@ -38,7 +38,7 @@ jobs:
           MODEL_ID: ${{ inputs.model_id || 'Qwen/Qwen3.8-27B:ovhcloud' }}
           HF_BASE_URL: ${{ inputs.base_url || 'https://router.huggingface.co/v1' }}
         run: >-
-          python scripts/live_benchmark.py
+          python -m scripts.live_benchmark
           --limit ${{ inputs.scenario_limit || '8' }}
           --output benchmark-results/live_results.json
       - name: Upload benchmark report
