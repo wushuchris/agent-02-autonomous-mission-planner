@@ -46,6 +46,13 @@ def _service_message(status_code: int | None) -> str:
     return "The inference provider is unavailable or failed to respond. Try again later."
 
 
+def _timeout_message(timeout_seconds: float) -> str:
+    return (
+        "The inference provider did not finish the structured response within "
+        f"{timeout_seconds:.0f} seconds. Try again."
+    )
+
+
 def _uses_low_reasoning(model_id: str) -> bool:
     """Use the documented low reasoning setting for Qwen3.8 structured output."""
     return model_id.startswith(_LOW_REASONING_MODEL_PREFIXES)
@@ -64,7 +71,7 @@ class HuggingFaceChatClient:
     base_url: str = HF_DEFAULT_BASE_URL
     temperature: float = 0.2
     max_tokens: int = 3600
-    timeout_seconds: float = 45.0
+    timeout_seconds: float = 120.0
     client: Any | None = None
 
     @classmethod
@@ -144,7 +151,9 @@ class HuggingFaceChatClient:
 
             if isinstance(exc, APIStatusError):
                 raise ModelServiceError(_service_message(exc.status_code)) from None
-            if isinstance(exc, (APITimeoutError, APIConnectionError)):
+            if isinstance(exc, APITimeoutError):
+                raise ModelServiceError(_timeout_message(self.timeout_seconds)) from None
+            if isinstance(exc, APIConnectionError):
                 raise ModelServiceError(_service_message(None)) from None
             raise
 
