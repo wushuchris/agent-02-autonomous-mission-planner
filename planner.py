@@ -62,6 +62,12 @@ Output requirements:
 - Dependencies must use task_id values.
 - Every task must have at least one completion criterion.
 - Human approval requirements from the mission request must be reflected in tasks and approval_gates.
+- Copy every request constraint verbatim into covered_constraints; this records coverage, not proof of compliance.
+- Copy every approval rule verbatim into approval_gates.
+- Use exact available_resources labels in assigned_resources, not aliases or individual units inferred from quantities.
+- If the request has approval rules, mark every task human_approval_required=true.
+- High and critical risk tasks must require human approval and have a nonblank approval gate.
+- Keep all approval-sensitive tasks planned or blocked; no human decision has been recorded.
 - The plan must contain a concrete next_action.
 """.strip()
 
@@ -187,5 +193,7 @@ def plan_to_markdown(plan: MissionPlan) -> str:
     lines.extend(f"- {item}" for item in plan.success_criteria)
 
     lines.extend(["", "## 9. Next Best Action", plan.next_action])
+    lines.extend(["", "## 10. Represented Constraints (Not Verified Compliance)"])
+    lines.extend(f"- {item}" for item in plan.covered_constraints or ["None stated."])
 
     return "\n".join(lines)

@@ -8,6 +8,8 @@ from pydantic import ValidationError
 
 from models import MissionRequest, PlanningDepth
 from planner import PlannerOutputError, generate_structured_plan, plan_to_markdown
+from plan_graph import build_plan_graph
+from validator import apply_validation_status, validate_plan
 
 
 load_dotenv()
@@ -89,8 +91,8 @@ with st.sidebar:
     st.header("Engineering Pattern")
     st.write("**The LLM proposes. Rules validate. The agent replans. Humans approve.**")
     st.caption(
-        "Current upgrade stage: structured plan generation and schema validation. "
-        "Deterministic plan-graph validation and bounded replanning are added in the next phases."
+        "Current upgrade stage: structured planning, schema validation and deterministic graph checks. "
+        "Bounded replanning and human decision capture remain future phases."
     )
 
     st.header("Safety Boundary")
@@ -185,6 +187,8 @@ planning_depth = st.selectbox(
 generate_button = st.button("Generate Structured Search and Rescue Plan", type="primary")
 
 if generate_button:
+    for key in ("mission_plan", "mission_request", "validation_result"):
+        st.session_state.pop(key, None)
     try:
         mission_request = build_mission_request(
             rescue_objective=rescue_objective,
@@ -204,6 +208,9 @@ if generate_button:
                 hf_token=get_hf_token(),
             )
 
+        validation = validate_plan(mission_request, plan)
+        plan = apply_validation_status(plan, validation)
+        st.session_state["validation_result"] = validation
         st.session_state["mission_request"] = mission_request
         st.session_state["mission_plan"] = plan
 
@@ -226,21 +233,42 @@ if generate_button:
 if "mission_plan" in st.session_state:
     plan = st.session_state["mission_plan"]
     mission_request = st.session_state["mission_request"]
+    validation = st.session_state["validation_result"]
     plan_markdown = plan_to_markdown(plan)
+    plan_markdown += "\n\n## Deterministic Validation\n"
+    plan_markdown += "PASS" if validation.valid else "FAIL — proposal requires correction"
+    plan_markdown += "\n" + "\n".join(f"- {item}" for item in validation.errors + validation.warnings)
     plan_json = plan.model_dump_json(indent=2)
 
     st.divider()
     st.subheader("Generated Search and Rescue Mission Plan")
 
-    status_col, mission_col = st.columns(2)
+    status_col, validation_col, mission_col = st.columns(3)
     status_col.metric("Schema Status", "VALID")
+    validation_col.metric("Deterministic Checks", "PASS" if validation.valid else "FAIL")
     mission_col.metric("Plan Status", plan.plan_status.value)
 
     st.success(
         "The model output was successfully parsed into the MissionPlan Pydantic schema. "
-        "Semantic plan-graph validation is not yet applied in this upgrade stage."
+        "This confirms structure and types, not plan correctness."
     )
 
+    if validation.valid:
+        st.info("Deterministic checks passed. This is an advisory proposal awaiting human review, not authorization to execute.")
+    else:
+        st.error("Deterministic validation failed. This proposal must be corrected before use. Automatic replanning is not implemented.")
+    for error in validation.errors:
+        st.error(error)
+    for warning in validation.warnings:
+        st.warning(warning)
+    with st.expander("View Dependency Graph"):
+        graph = build_plan_graph(plan)
+        st.json({"dependencies": graph.dependencies, "topological_order": graph.topological_order, "errors": graph.errors})
+        st.caption("Dependencies list each task's prerequisites. The ordering is structural, not an execution schedule. Invalid graphs have no ordering.")
+    with st.expander("View Deterministic Validation JSON"):
+        st.json(validation.model_dump(mode="json"))
+    st.download_button("Download Validation JSON", validation.model_dump_json(indent=2),
+                       "plan_validation.json", "application/json")
     st.markdown(plan_markdown)
 
     with st.expander("View Structured Mission Request"):
