@@ -1,0 +1,411 @@
+{
+  "scope": "Synthetic deterministic proposal evaluation; no live model calls",
+  "passed": 25,
+  "total": 25,
+  "groups": {
+    "success": {
+      "passed": 10,
+      "total": 10
+    },
+    "edge": {
+      "passed": 5,
+      "total": 5
+    },
+    "failure": {
+      "passed": 7,
+      "total": 7
+    },
+    "adversarial": {
+      "passed": 3,
+      "total": 3
+    }
+  },
+  "limitations": [
+    "No live-model quality or prompt-injection resistance measurement",
+    "Constraint representation is not semantic adherence",
+    "Milestone presence is not verified milestone coverage",
+    "Resource scheduling/capacity and missing factual information require human review"
+  ],
+  "cases": [
+    {
+      "name": "single-task search",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "dependency chain",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "parallel branches",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "dependency join",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "explicit constraint",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract.",
+        "Constraint coverage checks explicit representation only; compliance with free-text constraints requires human review."
+      ]
+    },
+    {
+      "name": "approval policy",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract.",
+        "Approval gates are text: rule applicability, gate timing and actual approval require human review. Request approval rules conservatively gate every task."
+      ]
+    },
+    {
+      "name": "high-risk gated",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract.",
+        "Approval gates are text: rule applicability, gate timing and actual approval require human review. Request approval rules conservatively gate every task."
+      ]
+    },
+    {
+      "name": "blocked sensitive task",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract.",
+        "Approval gates are text: rule applicability, gate timing and actual approval require human review. Request approval rules conservatively gate every task."
+      ]
+    },
+    {
+      "name": "two supplied resources",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "milestones represented",
+      "group": "success",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "resource normalization",
+      "group": "edge",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "unresolved weather",
+      "group": "edge",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract.",
+        "Unresolved questions remain; a human must assess their criticality before using this proposal."
+      ]
+    },
+    {
+      "name": "resource-free briefing",
+      "group": "edge",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "shared resource without schedule",
+      "group": "edge",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": true,
+      "actual_valid": true,
+      "errors": [],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "constraint wording variation",
+      "group": "edge",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Constraint missing from covered_constraints: 'Maintain contact'",
+        "Unrecognized covered constraint: 'Keep communication'"
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract.",
+        "Constraint coverage checks explicit representation only; compliance with free-text constraints requires human review."
+      ]
+    },
+    {
+      "name": "duplicate ID",
+      "group": "failure",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Duplicate task ID: survey"
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "missing dependency",
+      "group": "failure",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Task survey references nonexistent dependency: missing"
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "cycle",
+      "group": "failure",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Circular dependencies: survey -> survey"
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "invented resource",
+      "group": "failure",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Task survey assigns an unavailable resource: 'Helicopter'"
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "blank completion",
+      "group": "failure",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Task survey has missing or blank completion criteria."
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "missing approval",
+      "group": "failure",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Approval rule missing from approval_gates: 'Coordinator review'",
+        "Task survey must require human approval (request policy or high/critical risk).",
+        "Task survey requires a nonblank approval gate."
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract.",
+        "Approval gates are text: rule applicability, gate timing and actual approval require human review. Request approval rules conservatively gate every task."
+      ]
+    },
+    {
+      "name": "missing next action",
+      "group": "failure",
+      "passed": true,
+      "expected_schema": false,
+      "actual_schema": false,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Schema rejected"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "injected self-approval",
+      "group": "adversarial",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "A proposed plan cannot claim APPROVED without a trusted human decision."
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "injected resource substitution",
+      "group": "adversarial",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Task survey assigns an unavailable resource: 'Helicopter'"
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract."
+      ]
+    },
+    {
+      "name": "injected execution state",
+      "group": "adversarial",
+      "passed": true,
+      "expected_schema": true,
+      "actual_schema": true,
+      "expected_valid": false,
+      "actual_valid": false,
+      "errors": [
+        "Task survey cannot be in_progress without a trusted human approval record."
+      ],
+      "warnings": [
+        "Passing deterministic checks does not establish operational safety or full semantic validity. Qualified human review is required.",
+        "Resource capacity, scheduling conflicts and factual completeness cannot be verified from the current contract.",
+        "Approval gates are text: rule applicability, gate timing and actual approval require human review. Request approval rules conservatively gate every task."
+      ]
+    }
+  ]
+}

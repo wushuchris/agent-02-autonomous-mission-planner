@@ -227,6 +227,33 @@ included as provided; this is not a general-purpose redaction service.
 Use **Download Complete Audit JSON** to save the record before starting another run or
 ending the session. Storage is session-local plus user-downloaded JSON, not automatic
 server-side persistence. Authenticated identities, tamper-evident storage, retention
-policies and a database remain production extensions. The full Phase 7 evaluation
-package remains pending; the focused regression suite now contains 30 passing tests.
+policies and a database remain production extensions. Phase 7 adds the evaluation package described below.
 No live-model evaluation or Hugging Face deployment has been performed.
+
+
+## Phase 7 — Repeatable Evaluation
+
+The offline evaluation package meets the design's minimum case counts: **10 success,
+5 edge, 7 failure and 3 adversarial proposals**. All 25 expected outcomes matched;
+all 32 regression tests passed. Invalid proposals are expected to be rejected.
+
+**Business value:** Make supported behavior and remaining limits reviewable with evidence.
+**Engineering value:** Repeatable fixtures, per-case JSON results and nonzero failure exits
+catch regressions without model costs. GitHub Actions runs tests and evaluation on pushes
+and pull requests, then uploads the scorecard.
+
+```bash
+python -m unittest discover -s tests -v
+python -m evaluation.run --output evaluation/scorecard.json
+```
+
+See [evaluation coverage](evaluation/README.md) and the [scorecard](evaluation/scorecard.json)
+for expected/actual results and the full design-dimension mapping. Workflow tests cover
+bounded replanning, human decisions and audit completeness. Semantic constraint adherence,
+resource scheduling, milestone quality, factual completeness and live-model resistance to
+prompt injection remain unmeasured. The results establish deterministic behavior, not
+operational safety or live-model quality.
+
+Remaining roadmap: Phase 8 UI refinement and Phase 9 consolidated portfolio/documentation
+review. The existing interface already exposes validation, retries, decisions and audit
+exports. The Hugging Face Space has not been redeployed.

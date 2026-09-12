@@ -595,3 +595,12 @@ record even when initial generation fails. Raw provider errors and credentials a
 captured. Persistence is by user download; automated server-side storage and authenticated
 reviewer identities remain production extensions. Phase 7's full evaluation package is
 still pending, distinct from the 30 focused regression tests delivered through Phase 6.
+
+## Phase 7 Implementation Note
+
+The offline package now contains 10 success, 5 edge, 7 failure and 3 adversarial proposal
+fixtures, a JSON scorecard and failure-exit CLI. The 32-test regression suite covers
+workflow, review and audit behavior. CI runs both packages. `evaluation/README.md` maps
+every design dimension to evidence or an explicit measurement limit. Semantic plan
+quality and live-model prompt-injection resistance remain unmeasured; fixture success
+must not be described as operational readiness. Phases 8 and 9 remain next.
