@@ -39,16 +39,16 @@ The scenarios stay within the project's humanitarian advisory scope. They use no
 ```bash
 export HF_TOKEN=...
 export MODEL_ID=Qwen/Qwen3.8-27B:ovhcloud
-python scripts/live_benchmark.py
+python -m scripts.live_benchmark
 ```
 
 Optional:
 
 ```bash
-python scripts/live_benchmark.py --limit 2 --output /tmp/agent02-live.json
+python -m scripts.live_benchmark --limit 2 --output /tmp/agent02-live.json
 ```
 
-The repository also includes a manual **Live model benchmark** GitHub Actions workflow. It is never called by routine push/PR CI.
+The repository also includes a manual **Live model benchmark** GitHub Actions workflow. It is never called by routine push/PR CI. The workflow reads the dedicated `HF_INFERENCE_TOKEN` repository secret and maps it to the runtime `HF_TOKEN` environment variable only for the benchmark job.
 
 ## Output
 
@@ -64,8 +64,27 @@ The JSON report includes aggregate metrics plus one record per scenario. Each sc
 
 Suggested interpretation: 1 = poor, 3 = usable with meaningful revision, 5 = strong advisory output. Human scores remain subjective and should identify the reviewer and notes.
 
+## First recorded run
+
+On 2026-09-12, the full eight-scenario benchmark ran against `Qwen/Qwen3.8-27B:ovhcloud` through Hugging Face Inference Providers.
+
+- Schema success: **100% (8/8)**
+- First-pass deterministic validation: **100% (8/8)**
+- Final deterministic validation: **100% (8/8)**
+- Initial/final resource-conflict scenario rate: **0% / 0%**
+- Expected unresolved-question behavior: **100%**
+- Adversarial contract pass: **100%** for the single tagged fixture
+- Median latency: **31.449 seconds**
+- p95 latency: **109.257 seconds**
+- Mean model calls per schema-successful scenario: **1.0**
+- Human usefulness scoring: **not yet completed**
+
+Because every first proposal passed deterministic validation, this run did **not** exercise the live bounded-repair path and therefore cannot claim a live replan repair rate. The repair path remains covered by deterministic and mocked-model regression tests.
+
+See [`results-2026-09-12.md`](results-2026-09-12.md) for the recorded run summary.
+
 ## Interpretation
 
-A high schema or validation rate demonstrates contract compatibility and application-level robustness for this controlled set. A low first-pass rate with a high final rate demonstrates useful bounded repair, but also higher latency/cost. A nonzero final resource-conflict rate is an important failure signal. Prompt-injection success here only demonstrates preservation of the application contract for the tested fixture; it does not establish broad jailbreak resistance.
+A high schema or validation rate demonstrates contract compatibility and application-level robustness for this controlled set. A low first-pass rate with a high final rate would demonstrate useful bounded repair, but also higher latency/cost. A nonzero final resource-conflict rate is an important failure signal. Prompt-injection success here only demonstrates preservation of the application contract for the tested fixture; it does not establish broad jailbreak resistance.
 
 One execution per scenario is the initial evidence layer, not a variance study. If run-to-run stability matters, repeat the entire benchmark deliberately and compare reports rather than placing live inference in continuous integration.
