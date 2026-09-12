@@ -77,12 +77,13 @@ Output requirements:
 - Every task must have a unique task_id.
 - Dependencies must use task_id values.
 - Every task must have at least one completion criterion.
-- Human approval requirements from the mission request must be reflected in tasks and approval_gates.
-- Copy every request constraint verbatim into covered_constraints; this records coverage, not proof of compliance.
-- Copy every approval rule verbatim into approval_gates.
+- Human approval requirements from the mission request must be reflected in tasks.
+- covered_constraints is application-owned policy metadata. Return it as an empty array; the application will copy the trusted request constraints exactly after schema validation.
+- If the request contains approval_rules, approval_gates is application-owned policy metadata. Return it as an empty array; the application will copy the trusted approval rules exactly after schema validation.
+- If the request has no approval_rules but you create a high/critical-risk or otherwise approval-sensitive task, include a concise nonblank approval gate.
 - Use exact available_resources labels in assigned_resources, not aliases or individual units inferred from quantities.
 - If the request has approval rules, mark every task human_approval_required=true.
-- High and critical risk tasks must require human approval and have a nonblank approval gate.
+- High and critical risk tasks must require human approval.
 - Keep all approval-sensitive tasks planned or blocked; no human decision has been recorded.
 - The plan must contain a concrete next_action.
 """.strip()
@@ -108,6 +109,30 @@ def _extract_json_object(raw_text: str) -> str:
     return text[start : end + 1]
 
 
+def _attach_trusted_request_contract(
+    mission_request: MissionRequest,
+    plan: MissionPlan,
+) -> MissionPlan:
+    """Attach request-owned policy metadata without claiming semantic compliance.
+
+    The model reasons about the plan, but it is not trusted to reproduce policy strings.
+    Constraints are copied exactly from the request because covered_constraints records
+    representation only. Request approval rules likewise replace model paraphrases. When
+    no request approval rules exist, model-proposed gates are retained so risk-driven
+    approval gates can still be represented.
+    """
+
+    updates: dict[str, object] = {
+        "covered_constraints": list(mission_request.constraints),
+    }
+    if mission_request.approval_rules:
+        updates["approval_gates"] = list(mission_request.approval_rules)
+    else:
+        updates["approval_gates"] = list(plan.approval_gates)
+
+    return plan.model_copy(update=updates)
+
+
 def generate_structured_plan(
     mission_request: MissionRequest,
     hf_token: str,
@@ -122,7 +147,8 @@ def generate_structured_plan(
     Provider configuration is isolated behind JsonChatModel. The default runtime adapter
     uses Hugging Face Inference Providers through its OpenAI-compatible endpoint and asks
     the provider to enforce the MissionPlan schema. Pydantic validation remains the
-    application authority after inference.
+    application authority after inference. Request-owned policy metadata is then attached
+    deterministically so exact policy strings are never delegated to the model.
     """
 
     client = model_client or HuggingFaceChatClient.from_env(
@@ -173,6 +199,8 @@ def generate_structured_plan(
 
     if plan.mission_id != mission_request.mission_id:
         raise PlannerOutputError("The planner changed the mission_id.")
+
+    plan = _attach_trusted_request_contract(mission_request, plan)
 
     if plan.plan_status is not PlanStatus.DRAFT:
         plan = plan.model_copy(update={"plan_status": PlanStatus.DRAFT})
