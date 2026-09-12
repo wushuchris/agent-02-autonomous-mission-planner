@@ -550,3 +550,14 @@ The Agent 02 upgrade is complete when:
 - the planning engine can be reused independently of the search and rescue UI.
 
 At that point, Agent 02 will function as both a polished portfolio application and a reusable planning primitive for later agents in the 30-agent curriculum.
+
+## Phase 3 Implementation Note
+
+Phase 3 now provides `plan_graph.py`, `validator.py`, focused regression tests and
+Streamlit validation visibility. See the README for exact matching and approval policy.
+The only additive contract field is `MissionPlan.covered_constraints` (default `[]`),
+which makes representation mechanically checkable without claiming semantic compliance.
+Resource capacity/scheduling and approval gate applicability/timing remain human-review
+limitations of the existing text-based contract. Approval rules conservatively gate all
+tasks, and high/critical risk tasks require approval. No trusted approval is recorded yet.
+Phase 4 bounded replanning, Phase 5 human decisions and Phase 6 audit logging remain pending.

@@ -90,6 +90,7 @@ class MissionPlan(PlanningModel):
     milestones: list[str] = Field(default_factory=list)
     tasks: list[MissionTask] = Field(min_length=1)
     risks: list[str] = Field(default_factory=list)
+    covered_constraints: list[str] = Field(default_factory=list)
     approval_gates: list[str] = Field(default_factory=list)
     success_criteria: list[str] = Field(min_length=1)
     next_action: str = Field(min_length=1)
