@@ -12,6 +12,7 @@ from model_adapter import (
 )
 from models import MissionPlan, MissionRequest, PlanningDepth
 from planner import build_structured_prompt, generate_structured_plan
+from validator import validate_plan
 
 
 class FakeCompletions:
@@ -54,35 +55,37 @@ def request(planning_depth=PlanningDepth.STANDARD):
     )
 
 
+def valid_plan_dict():
+    return {
+        "mission_id": "sar-test",
+        "summary": "Conduct a bounded search around the last known location.",
+        "assumptions": [],
+        "unresolved_questions": [],
+        "milestones": ["Initial sweep complete"],
+        "tasks": [
+            {
+                "task_id": "T1",
+                "title": "Confirm search area",
+                "description": "Coordinator confirms the bounded search area.",
+                "dependencies": [],
+                "assigned_resources": ["1 ground team"],
+                "risk_level": "low",
+                "human_approval_required": True,
+                "completion_criteria": ["Search area confirmed"],
+                "status": "planned",
+            }
+        ],
+        "risks": [],
+        "covered_constraints": ["Maintain visual line of sight"],
+        "approval_gates": ["Coordinator approves search-area expansion"],
+        "success_criteria": ["Complete one documented sweep"],
+        "next_action": "Confirm the search area with the coordinator.",
+        "plan_status": "DRAFT",
+    }
+
+
 def valid_plan_json():
-    return json.dumps(
-        {
-            "mission_id": "sar-test",
-            "summary": "Conduct a bounded search around the last known location.",
-            "assumptions": [],
-            "unresolved_questions": [],
-            "milestones": ["Initial sweep complete"],
-            "tasks": [
-                {
-                    "task_id": "T1",
-                    "title": "Confirm search area",
-                    "description": "Coordinator confirms the bounded search area.",
-                    "dependencies": [],
-                    "assigned_resources": ["1 ground team"],
-                    "risk_level": "low",
-                    "human_approval_required": True,
-                    "completion_criteria": ["Search area confirmed"],
-                    "status": "planned",
-                }
-            ],
-            "risks": [],
-            "covered_constraints": ["Maintain visual line of sight"],
-            "approval_gates": ["Coordinator approves search-area expansion"],
-            "success_criteria": ["Complete one documented sweep"],
-            "next_action": "Confirm the search area with the coordinator.",
-            "plan_status": "DRAFT",
-        }
-    )
+    return json.dumps(valid_plan_dict())
 
 
 class ModelAdapterTests(unittest.TestCase):
@@ -165,6 +168,13 @@ class ModelAdapterTests(unittest.TestCase):
         self.assertIn("task description under 300 characters", prompt)
         self.assertIn("no more than 3 completion criteria per task", prompt)
 
+    def test_prompt_marks_policy_metadata_as_application_owned(self):
+        prompt = build_structured_prompt(request())
+        self.assertIn("covered_constraints is application-owned policy metadata", prompt)
+        self.assertIn("approval_gates is application-owned policy metadata", prompt)
+        self.assertIn("copy the trusted request constraints exactly", prompt)
+        self.assertIn("copy the trusted approval rules exactly", prompt)
+
     def test_quick_and_detailed_depths_have_distinct_task_limits(self):
         quick = build_structured_prompt(request(PlanningDepth.QUICK))
         detailed = build_structured_prompt(request(PlanningDepth.DETAILED))
@@ -214,6 +224,50 @@ class ModelAdapterTests(unittest.TestCase):
         )
         self.assertEqual(plan.mission_id, "sar-test")
         self.assertEqual(plan.tasks[0].task_id, "T1")
+
+    def test_planner_attaches_exact_request_policy_before_validation(self):
+        mission_request = request()
+        proposed = valid_plan_dict()
+        proposed["covered_constraints"] = ["Keep drone in sight"]
+        proposed["approval_gates"] = ["Coordinator checks expansion"]
+        fake_adapter = HuggingFaceChatClient(
+            model_id="model",
+            token="test-token",
+            client=FakeOpenAIClient(json.dumps(proposed)),
+        )
+
+        plan = generate_structured_plan(
+            mission_request=mission_request,
+            hf_token="ignored-by-injected-client",
+            model_client=fake_adapter,
+        )
+        validation = validate_plan(mission_request, plan)
+
+        self.assertEqual(plan.covered_constraints, mission_request.constraints)
+        self.assertEqual(plan.approval_gates, mission_request.approval_rules)
+        self.assertEqual(validation.constraint_violations, [])
+        self.assertEqual(validation.approval_issues, [])
+        self.assertTrue(validation.valid)
+
+    def test_model_gate_is_retained_when_request_has_no_approval_rules(self):
+        mission_request = request().model_copy(update={"approval_rules": []})
+        proposed = valid_plan_dict()
+        proposed["approval_gates"] = ["Supervisor reviews high-risk task"]
+        proposed["tasks"][0]["risk_level"] = "high"
+        fake_adapter = HuggingFaceChatClient(
+            model_id="model",
+            token="test-token",
+            client=FakeOpenAIClient(json.dumps(proposed)),
+        )
+
+        plan = generate_structured_plan(
+            mission_request=mission_request,
+            hf_token="ignored-by-injected-client",
+            model_client=fake_adapter,
+        )
+
+        self.assertEqual(plan.approval_gates, ["Supervisor reviews high-risk task"])
+        self.assertTrue(validate_plan(mission_request, plan).valid)
 
 
 if __name__ == "__main__":
