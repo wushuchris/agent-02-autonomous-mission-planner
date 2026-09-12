@@ -1,4 +1,5 @@
 """Planning run snapshots and JSON export, without credentials or raw errors."""
+import os
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -7,7 +8,12 @@ from models import HumanDecision, MissionPlan, MissionRequest, PlanningRunRecord
 
 
 def new_run(request: MissionRequest) -> PlanningRunRecord:
-    return PlanningRunRecord(run_id=uuid4().hex, mission_request=request.model_copy(deep=True))
+    model_name = os.getenv("MODEL_ID", "").strip() or "MODEL_ID not configured"
+    return PlanningRunRecord(
+        run_id=uuid4().hex,
+        mission_request=request.model_copy(deep=True),
+        model_name=model_name,
+    )
 
 
 def record_decision(run: PlanningRunRecord, plan: MissionPlan, decision: ReviewDecision) -> PlanningRunRecord:
