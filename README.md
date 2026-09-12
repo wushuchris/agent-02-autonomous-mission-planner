@@ -156,9 +156,9 @@ python -m evaluation.run --output evaluation/scorecard.json
 ```
 
 **25/25 expected scenario outcomes:** 10 success, 5 edge, 7 failure and 3 adversarial.
-The regression suite covers planning, review, audit, Streamlit behavior, provider-neutral
-inference configuration and injected-model behavior. CI runs both commands and uploads a
-scorecard. Invalid proposals are expected to be rejected.
+**40/40 regression tests** currently pass, covering planning, review, audit, Streamlit
+behavior, provider-neutral inference configuration and injected-model behavior. CI runs
+both commands and uploads a scorecard. Invalid proposals are expected to be rejected.
 
 See [coverage and limitations](evaluation/README.md) and the [JSON scorecard](evaluation/scorecard.json).
 These are synthetic deterministic checks and mocked model workflows, not live-model quality,
@@ -179,8 +179,26 @@ The Hugging Face runtime must provide:
 - optional `HF_BASE_URL` (the adapter defaults to `https://router.huggingface.co/v1`).
 
 The deployment preserves the Space Dockerfile, metadata, runtime secrets and unrelated
-Space files. After a model/runtime change, the live Space should receive a deliberate
-smoke test before the release is considered production-validated.
+Space files.
+
+## Deliberate live inference smoke test
+
+Live inference is intentionally excluded from normal CI so commits do not spend provider
+credits or depend on network availability. After a runtime/model change, run one explicit
+end-to-end check:
+
+```bash
+python scripts/live_smoke_test.py
+```
+
+The repository also includes a manual GitHub Actions workflow named **Live inference smoke**.
+From the Actions tab, run it deliberately and supply the model identifier. The workflow uses
+the repository `HF_TOKEN` secret, calls the configured Hugging Face router, exercises one
+synthetic mission through structured generation plus bounded validation/replanning, and
+fails if the final proposal does not pass deterministic validation.
+
+A passing smoke test demonstrates provider connectivity and contract compatibility. It does
+**not** establish operational search-and-rescue safety or broad model quality.
 
 ## Upgrade status and next evidence
 
