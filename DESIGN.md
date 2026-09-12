@@ -573,3 +573,14 @@ proposal retained for review. Initial generation errors still fail closed withou
 retries. Streamlit exposes attempt counts, revision results and the reason for stopping.
 No human approval is inferred and no execution is enabled. Full audit persistence,
 trusted human decision capture and provider resilience remain outside this phase.
+
+## Phase 5 Implementation Note
+
+`approval.py` now applies explicit human approve/reject/request-revision decisions to
+reviewable proposals. Approval revalidates the saved request and plan; fingerprints
+reject stale content, and terminal decisions cannot be overwritten. Revision requires
+notes and uses the additive `REVISION_REQUESTED` plan state. A new generation clears
+the previous decision. Revision requests require manual input changes and a fresh run,
+not an automatic model call. Session review records include decision, notes, timestamp
+and fingerprint; they do not authenticate the reviewer or authorize real-world execution.
+Phase 6 remains responsible for complete planning-run audit records and persistence.
