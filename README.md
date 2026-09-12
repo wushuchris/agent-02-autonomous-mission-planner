@@ -24,11 +24,16 @@ are claimed; the evidence here is engineering behavior on synthetic cases.
 
 ```text
 MissionRequest → LLM proposal → MissionPlan schema check
+→ attach trusted request policy metadata
 → dependency graph + deterministic validation
     FAIL → latest proposal + feedback → at most 2 revisions
     PASS → human review
 → approve / reject / request revision → PlanningRunRecord JSON
 ```
+
+The model is responsible for planning judgment; application code owns exact request-policy
+strings and validation invariants. This avoids spending model capacity on clerical copying
+and prevents harmless paraphrases from weakening an exact policy contract.
 
 The engine is independent of Streamlit. It can support future orchestration, logistics,
 incident-response and multi-agent decomposition work, while this interface remains a
@@ -38,7 +43,7 @@ search-and-rescue demonstration.
 | --- | --- |
 | `models.py` | Request, plan, validation, state and audit contracts |
 | `model_adapter.py` | Provider-neutral JSON chat contract plus OpenAI-compatible Hugging Face runtime adapter |
-| `planner.py` | Structured plan prompting, schema/mission identity checks and Markdown rendering |
+| `planner.py` | Structured plan prompting, schema/mission identity checks, trusted request-policy attachment and Markdown rendering |
 | `plan_graph.py` | Unique IDs, existing dependencies, cycles and topological order |
 | `validator.py` | Deterministic resource, completion, approval, constraint-representation and next-action checks |
 | `planning_engine.py` | Up to two revisions after the initial proposal; stop on success or escalate |
@@ -67,8 +72,10 @@ are required for live inference. The adapter uses a bounded request timeout and 
 known authentication, permission, billing, rate-limit and provider failures into fixed
 public messages rather than exposing raw provider responses or credentials.
 
-The model remains a **proposal layer**. Deterministic graph and policy validation, bounded
-retry count, approval state transitions and audit behavior remain application-owned.
+The model remains a **proposal layer**. Exact request constraints and request approval rules
+are attached by application code after schema validation; deterministic graph and policy
+validation, bounded retry count, approval state transitions and audit behavior also remain
+application-owned.
 
 ## Run locally
 
@@ -105,10 +112,14 @@ Review controls appear after the proposal and findings so the decision follows t
 - Resource assignments match whole `available_resources` labels after case/whitespace
   normalization. Quantity labels are not split into inferred units; sensors are context
   unless also listed as assignable resources. Capacity and timing are not modeled.
-- Constraints must appear in `covered_constraints`, with whole-entry normalized matching.
-  This proves representation, **not semantic compliance**. Unknown entries are rejected.
-- Each approval rule must appear in `approval_gates`. Since rules are free text, any request
-  approval rule conservatively gates every task. High/critical risk also requires approval.
+- Request constraints are copied by application code into `covered_constraints` after the
+  model response passes schema validation. The validator then checks exact whole-entry
+  representation. This proves representation, **not semantic compliance**; free-text
+  compliance still requires human review.
+- Request approval rules are copied by application code into `approval_gates` rather than
+  relying on model paraphrases. Since rules are free text, any request approval rule
+  conservatively gates every task. If no request approval rules exist, model-proposed gates
+  are retained for risk-driven approval needs. High/critical risk also requires approval.
   Sensitive tasks must remain planned or blocked; prose cannot establish actual approval.
 - Task IDs must be unique, references must exist, and valid graphs must be acyclic.
   Duplicate IDs or missing references defer sorting/cycle analysis until repaired.
@@ -156,9 +167,10 @@ python -m evaluation.run --output evaluation/scorecard.json
 ```
 
 **25/25 expected scenario outcomes:** 10 success, 5 edge, 7 failure and 3 adversarial.
-**40/40 regression tests** currently pass, covering planning, review, audit, Streamlit
-behavior, provider-neutral inference configuration and injected-model behavior. CI runs
-both commands and uploads a scorecard. Invalid proposals are expected to be rejected.
+**43/43 regression tests** currently pass, covering planning, review, audit, Streamlit
+behavior, provider-neutral inference configuration, injected-model behavior and trusted
+request-policy attachment. CI runs both commands and uploads a scorecard. Invalid proposals
+are expected to be rejected.
 
 See [coverage and limitations](evaluation/README.md) and the [JSON scorecard](evaluation/scorecard.json).
 These are synthetic deterministic checks and mocked model workflows, not live-model quality,
