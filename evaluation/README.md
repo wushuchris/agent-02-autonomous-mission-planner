@@ -19,7 +19,7 @@ not a live-model benchmark. CI runs both commands and uploads a fresh scorecard.
 | Edge proposals | 5 / 5 |
 | Failure proposals | 7 / 7 |
 | Adversarial proposals | 3 / 3 |
-| Regression tests, including workflow and UI | 32 / 32 |
+| Regression tests, including workflow, UI and model-adapter behavior | 40 / 40 |
 
 These are synthetic inputs and proposed plans exercising distinct structures/policies,
 not sampled model generations. Scenario fixtures are in `cases.py`; `run.py` reports
@@ -42,9 +42,10 @@ that the scorecard detects incorrect behavior.
 | Safe failure | Mocked schema/provider failures and invalid-plan escalation in workflow/UI tests. |
 | Replanning | Mocked success on either revision, latest feedback propagation and two-revision exhaustion in `test_replanning.py`. |
 | Audit completeness | JSON roundtrip, snapshots, failed calls, credentials/error exclusion and review linkage in `test_audit.py`. |
+| Inference boundary | Runtime configuration, HTTPS enforcement, empty-response failure, sanitized service messages and provider-neutral client injection in `test_model_adapter.py`. |
 
-The workflow/UI dimensions are asserted by unittest, not counted as additional proposal
-fixtures in the JSON scorecard. See test output for their individual results.
+The workflow/UI/model-adapter dimensions are asserted by unittest, not counted as
+additional proposal fixtures in the JSON scorecard. See test output for their individual results.
 
 ## Adversarial scope
 
