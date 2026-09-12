@@ -1,7 +1,13 @@
 import os
+import re
+from uuid import uuid4
+
 import streamlit as st
 from dotenv import load_dotenv
-from huggingface_hub import InferenceClient
+from pydantic import ValidationError
+
+from models import MissionRequest, PlanningDepth
+from planner import PlannerOutputError, generate_structured_plan, plan_to_markdown
 
 
 load_dotenv()
@@ -10,7 +16,7 @@ load_dotenv()
 st.set_page_config(
     page_title="Search and Rescue Mission Planning Agent",
     page_icon="🚁",
-    layout="wide"
+    layout="wide",
 )
 
 
@@ -22,117 +28,45 @@ def get_hf_token():
         return os.getenv("HF_TOKEN")
 
 
-def build_prompt(
-    rescue_objective,
-    search_environment,
-    search_area,
-    available_assets,
-    sensors,
-    constraints,
-    human_approval_rules,
-    success_criteria,
-    planning_depth
-):
-    """Create the search and rescue planning prompt for the model."""
+def parse_list_input(value: str) -> list[str]:
+    """Convert comma- or newline-separated UI text into clean structured entries."""
+    entries = re.split(r",|\n", value)
+    cleaned: list[str] = []
 
-    return f"""
-You are a Search and Rescue Mission Planning Agent.
+    for entry in entries:
+        item = entry.strip().strip(".")
+        if item.lower().startswith("and "):
+            item = item[4:].strip()
+        if item:
+            cleaned.append(item)
 
-Your job is to convert high-level rescue intent into a structured, human-in-the-loop search and rescue mission plan.
-
-Important safety rules:
-- Focus only on humanitarian, emergency response, missing person, disaster response, inspection, and public safety scenarios.
-- Do not provide weaponization, targeting, attack, evasion, or harmful engagement instructions.
-- Do not replace trained responders, incident commanders, emergency services, or legal authority.
-- Emphasize human oversight, responder safety, communication, risk awareness, and responsible use of autonomous systems.
-- Keep recommendations practical, non-violent, and operator-approved.
-
-Mission Inputs:
-Rescue Objective: {rescue_objective}
-Search Environment: {search_environment}
-Search Area: {search_area}
-Available Assets: {available_assets}
-Sensors: {sensors}
-Operational Constraints: {constraints}
-Human Approval Rules: {human_approval_rules}
-Success Criteria: {success_criteria}
-Planning Depth: {planning_depth}
-
-Return the mission plan in clear Markdown using this structure:
-
-# Search and Rescue Mission Plan
-
-## 1. Mission Summary
-Summarize the rescue mission in plain English.
-
-## 2. Mission Assumptions
-List key assumptions and uncertainties.
-
-## 3. Search Phases
-Create phased steps from initial setup through search completion.
-
-## 4. Asset Allocation
-Explain how each drone, responder, sensor, or support asset should be used.
-
-## 5. Dependencies
-List what must be true before or during the mission.
-
-## 6. Risk Assessment
-Identify operational, environmental, technical, and human safety risks.
-
-## 7. Human-in-the-Loop Checkpoints
-List points where a human operator, responder, or incident lead must review, confirm, or approve.
-
-## 8. Safe Response Recommendations
-Suggest safe options such as continue search, widen search area, mark point of interest, request responder review, return to base, preserve battery, or escalate to trained personnel.
-
-## 9. Success Criteria Review
-Explain how to evaluate whether the search mission succeeded.
-
-## 10. Next Best Action
-Give the immediate next action for the operator or incident coordinator.
-
-Keep the plan practical, concise, safety-focused, and appropriate for educational portfolio use.
-"""
+    return cleaned
 
 
-def generate_plan(prompt):
-    """Generate a search and rescue mission plan using Hugging Face InferenceClient."""
-
-    hf_token = get_hf_token()
-
-    if not hf_token:
-        return """
-⚠️ Hugging Face token not found.
-
-To run the live model, add your token as `HF_TOKEN` in Streamlit secrets or your local `.env` file.
-"""
-
-    client = InferenceClient(
-        model="Qwen/Qwen2.5-7B-Instruct",
-        token=hf_token
+def build_mission_request(
+    rescue_objective: str,
+    search_environment: str,
+    search_area: str,
+    available_assets: str,
+    sensors: str,
+    constraints: str,
+    human_approval_rules: str,
+    success_criteria: str,
+    planning_depth: str,
+) -> MissionRequest:
+    """Translate Streamlit form values into the reusable planning contract."""
+    return MissionRequest(
+        mission_id=f"sar-{uuid4().hex[:12]}",
+        objective=rescue_objective,
+        environment=search_environment,
+        search_area=search_area,
+        available_resources=parse_list_input(available_assets),
+        sensors=parse_list_input(sensors),
+        constraints=parse_list_input(constraints),
+        approval_rules=parse_list_input(human_approval_rules),
+        success_criteria=parse_list_input(success_criteria),
+        planning_depth=PlanningDepth(planning_depth),
     )
-
-    response = client.chat_completion(
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a careful, safety-focused search and rescue planning assistant. "
-                    "You support humanitarian planning only and do not provide harmful, weaponized, "
-                    "targeting, attack, evasion, or tactical engagement guidance."
-                )
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        max_tokens=1400,
-        temperature=0.4
-    )
-
-    return response.choices[0].message.content
 
 
 st.title("Search and Rescue Mission Planning Agent")
@@ -148,9 +82,15 @@ st.warning(
 with st.sidebar:
     st.header("About This Agent")
     st.write(
-        "This app demonstrates a planning agent for humanitarian search and rescue scenarios. "
-        "It helps organize rescue objectives into structured search phases, asset allocation, "
-        "risk assessment, human checkpoints, and next actions."
+        "This app demonstrates a reusable planning-agent pattern through a humanitarian search and rescue scenario. "
+        "It converts mission intent into a typed, machine-readable plan before presenting a human-readable version."
+    )
+
+    st.header("Engineering Pattern")
+    st.write("**The LLM proposes. Rules validate. The agent replans. Humans approve.**")
+    st.caption(
+        "Current upgrade stage: structured plan generation and schema validation. "
+        "Deterministic plan-graph validation and bounded replanning are added in the next phases."
     )
 
     st.header("Safety Boundary")
@@ -171,7 +111,7 @@ with col1:
             "complete one full sweep, report findings, identify possible hazards, and recommend "
             "the next safest search action."
         ),
-        height=140
+        height=140,
     )
 
     search_environment = st.text_area(
@@ -180,12 +120,12 @@ with col1:
             "Wilderness trail area, late afternoon, moderate tree cover, uneven terrain, "
             "limited visibility in some sections."
         ),
-        height=100
+        height=100,
     )
 
     search_area = st.text_input(
         "Search Area",
-        value="30-meter radius around the missing person's last known location"
+        value="30-meter radius around the missing person's last known location",
     )
 
     available_assets = st.text_area(
@@ -194,14 +134,16 @@ with col1:
             "2 small drones with cameras, 1 ground search team, 1 incident coordinator, "
             "basic first aid supplies, and radio communication."
         ),
-        height=100
+        height=100,
+        help="Separate resources with commas or new lines.",
     )
 
 with col2:
     sensors = st.text_area(
         "Sensors",
         value="RGB cameras, GPS positioning, telemetry feed, basic object detection.",
-        height=100
+        height=100,
+        help="Separate sensors with commas or new lines.",
     )
 
     constraints = st.text_area(
@@ -210,7 +152,8 @@ with col2:
             "Preserve battery life, avoid flying beyond visual line of sight, maintain communication "
             "with the ground team, avoid hazardous terrain, and do not move into unsafe areas without responder review."
         ),
-        height=120
+        height=120,
+        help="Separate constraints with commas or new lines.",
     )
 
     human_approval_rules = st.text_area(
@@ -219,7 +162,8 @@ with col2:
             "The incident coordinator must confirm the search area, review the initial sweep report, "
             "approve any search area expansion, and coordinate any physical response with trained personnel."
         ),
-        height=100
+        height=100,
+        help="Separate approval rules with commas or new lines.",
     )
 
     success_criteria = st.text_area(
@@ -228,39 +172,97 @@ with col2:
             "The team completes one structured sweep, identifies hazards and points of interest, "
             "documents findings, preserves responder safety, and recommends the next search action."
         ),
-        height=100
+        height=100,
+        help="Separate success criteria with commas or new lines.",
     )
 
 planning_depth = st.selectbox(
     "Planning Depth",
-    options=["Quick", "Standard", "Detailed"],
-    index=1
+    options=[depth.value for depth in PlanningDepth],
+    index=1,
 )
 
-generate_button = st.button("Generate Search and Rescue Plan", type="primary")
+generate_button = st.button("Generate Structured Search and Rescue Plan", type="primary")
 
 if generate_button:
-    with st.spinner("Generating search and rescue plan..."):
-        prompt = build_prompt(
-            rescue_objective,
-            search_environment,
-            search_area,
-            available_assets,
-            sensors,
-            constraints,
-            human_approval_rules,
-            success_criteria,
-            planning_depth
+    try:
+        mission_request = build_mission_request(
+            rescue_objective=rescue_objective,
+            search_environment=search_environment,
+            search_area=search_area,
+            available_assets=available_assets,
+            sensors=sensors,
+            constraints=constraints,
+            human_approval_rules=human_approval_rules,
+            success_criteria=success_criteria,
+            planning_depth=planning_depth,
         )
 
-        plan = generate_plan(prompt)
+        with st.spinner("Generating structured search and rescue plan..."):
+            plan = generate_structured_plan(
+                mission_request=mission_request,
+                hf_token=get_hf_token(),
+            )
 
+        st.session_state["mission_request"] = mission_request
+        st.session_state["mission_plan"] = plan
+
+    except ValidationError as exc:
+        st.error("The mission request did not satisfy the planning input schema.")
+        st.code(str(exc))
+    except PlannerOutputError as exc:
+        st.error(str(exc))
+        st.info(
+            "The planner failed closed rather than accepting malformed model output. "
+            "Try generating the plan again or revise the mission inputs."
+        )
+    except Exception:
+        st.error(
+            "The planning service encountered an unexpected error. "
+            "No plan was accepted. Please try again."
+        )
+
+
+if "mission_plan" in st.session_state:
+    plan = st.session_state["mission_plan"]
+    mission_request = st.session_state["mission_request"]
+    plan_markdown = plan_to_markdown(plan)
+    plan_json = plan.model_dump_json(indent=2)
+
+    st.divider()
     st.subheader("Generated Search and Rescue Mission Plan")
-    st.markdown(plan)
 
-    st.download_button(
-        label="Download Search and Rescue Plan",
-        data=plan,
-        file_name="search_and_rescue_mission_plan.md",
-        mime="text/markdown"
+    status_col, mission_col = st.columns(2)
+    status_col.metric("Schema Status", "VALID")
+    mission_col.metric("Plan Status", plan.plan_status.value)
+
+    st.success(
+        "The model output was successfully parsed into the MissionPlan Pydantic schema. "
+        "Semantic plan-graph validation is not yet applied in this upgrade stage."
     )
+
+    st.markdown(plan_markdown)
+
+    with st.expander("View Structured Mission Request"):
+        st.json(mission_request.model_dump(mode="json"))
+
+    with st.expander("View Structured MissionPlan JSON"):
+        st.json(plan.model_dump(mode="json"))
+
+    download_col1, download_col2 = st.columns(2)
+
+    with download_col1:
+        st.download_button(
+            label="Download Human-Readable Plan",
+            data=plan_markdown,
+            file_name="search_and_rescue_mission_plan.md",
+            mime="text/markdown",
+        )
+
+    with download_col2:
+        st.download_button(
+            label="Download Structured Plan JSON",
+            data=plan_json,
+            file_name="search_and_rescue_mission_plan.json",
+            mime="application/json",
+        )
