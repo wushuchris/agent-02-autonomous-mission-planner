@@ -15,6 +15,9 @@ on:
         description: Number of scenarios to run (1-8; use 8 for the full benchmark)
         required: true
         default: '8'
+  push:
+    branches:
+      - live-model-benchmark
 
 permissions:
   contents: read
@@ -32,11 +35,11 @@ jobs:
       - name: Run controlled live benchmark
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          MODEL_ID: ${{ inputs.model_id }}
-          HF_BASE_URL: ${{ inputs.base_url }}
+          MODEL_ID: ${{ inputs.model_id || 'Qwen/Qwen3.8-27B:ovhcloud' }}
+          HF_BASE_URL: ${{ inputs.base_url || 'https://router.huggingface.co/v1' }}
         run: >-
           python scripts/live_benchmark.py
-          --limit ${{ inputs.scenario_limit }}
+          --limit ${{ inputs.scenario_limit || '8' }}
           --output benchmark-results/live_results.json
       - name: Upload benchmark report
         if: always()
