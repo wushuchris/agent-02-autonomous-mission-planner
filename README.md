@@ -50,7 +50,8 @@ search-and-rescue demonstration.
 | `approval.py` | Human decisions with revalidation and changed-proposal detection |
 | `audit.py` | Review-linked snapshots, configured model identity and complete JSON export |
 | `app.py` | Mission input, proposal review, human decision and downloads |
-| `evaluation/` | Synthetic scenarios, expectations and JSON scorecard |
+| `evaluation/` | Synthetic deterministic scenarios, expectations and JSON scorecard |
+| `benchmarks/live/` | Deliberate live-model scenarios, metrics and recorded benchmark evidence |
 
 ## Inference runtime
 
@@ -143,8 +144,9 @@ the review function.
 
 Passing proposals await human approval or review. Human decisions set `APPROVED`, `REJECTED`
 or `REVISION_REQUESTED`; task execution states remain unchanged. Human-requested revision
-starts no hidden model call. Safety framing is preserved in prompts, but live-model
-obedience and prompt-injection resistance have not yet been benchmarked.
+starts no hidden model call. Safety framing is preserved in prompts. The controlled live
+benchmark includes one tagged prompt-injection fixture that preserved the tested approval
+contract, but that single case does not establish broad prompt-injection or jailbreak resistance.
 
 ## Audit and storage
 
@@ -167,15 +169,30 @@ python -m evaluation.run --output evaluation/scorecard.json
 ```
 
 **25/25 expected scenario outcomes:** 10 success, 5 edge, 7 failure and 3 adversarial.
-**43/43 regression tests** currently pass, covering planning, review, audit, Streamlit
-behavior, provider-neutral inference configuration, injected-model behavior and trusted
-request-policy attachment. CI runs both commands and uploads a scorecard. Invalid proposals
-are expected to be rejected.
+**52/52 regression tests** currently pass, covering planning, review, audit, Streamlit
+behavior, provider-neutral inference configuration, injected-model behavior, trusted
+request-policy attachment and the live-benchmark harness. CI runs both commands and uploads
+a scorecard. Invalid proposals are expected to be rejected.
 
 See [coverage and limitations](evaluation/README.md) and the [JSON scorecard](evaluation/scorecard.json).
 These are synthetic deterministic checks and mocked model workflows, not live-model quality,
 operational safety or measured business outcomes. The adversarial fixtures test rule enforcement
-against hostile proposals, not model resistance to hostile instructions.
+against hostile proposals, not broad model resistance to hostile instructions.
+
+### Controlled live-model benchmark
+
+A separate manual benchmark runs the real provider/model path across eight synthetic
+humanitarian cases. On **2026-09-12**, `Qwen/Qwen3.8-27B:ovhcloud` produced schema-valid,
+deterministically valid first-pass proposals in **8/8** scenarios. The run recorded **0%**
+initial and final resource-conflict scenario rates, **100%** expected unresolved-question
+behavior, and a **100%** contract pass for the single tagged prompt-injection fixture.
+Median end-to-end latency was **31.449 seconds** and p95 latency was **109.257 seconds**.
+All plans remained `AWAITING_HUMAN_APPROVAL`.
+
+Because every first proposal passed validation, the live run did **not** exercise the bounded
+replan repair path; no live repair-rate claim is made. Human usefulness scoring is also still
+pending. See the [benchmark design](benchmarks/live/README.md) and the
+[first recorded result](benchmarks/live/results-2026-09-12.md).
 
 ## Deployment
 
@@ -200,14 +217,14 @@ credits or depend on network availability. After a runtime/model change, run one
 end-to-end check:
 
 ```bash
-python scripts/live_smoke_test.py
+python -m scripts.live_smoke_test
 ```
 
 The repository also includes a manual GitHub Actions workflow named **Live inference smoke**.
 From the Actions tab, run it deliberately and supply the model identifier. The workflow uses
-the repository `HF_TOKEN` secret, calls the configured Hugging Face router, exercises one
-synthetic mission through structured generation plus bounded validation/replanning, and
-fails if the final proposal does not pass deterministic validation.
+the dedicated repository `HF_INFERENCE_TOKEN` secret, calls the configured Hugging Face router,
+exercises one synthetic mission through structured generation plus bounded validation/replanning,
+and fails if the final proposal does not pass deterministic validation.
 
 A passing smoke test demonstrates provider connectivity and contract compatibility. It does
 **not** establish operational search-and-rescue safety or broad model quality.
@@ -215,12 +232,12 @@ A passing smoke test demonstrates provider connectivity and contract compatibili
 ## Upgrade status and next evidence
 
 The repository implements the planned typed contracts, structured planning, graph validation,
-bounded revisions, human decisions, audit export, offline evaluation, UI organization and
-GitHub-to-Hugging-Face deployment. Inference is separated from planning through the reusable
-model adapter described above.
+bounded revisions, human decisions, audit export, offline evaluation, UI organization,
+provider-neutral inference, GitHub-to-Hugging-Face deployment and a controlled live-model
+benchmark. The first eight-scenario live run is recorded in `benchmarks/live/`.
 
-The next evidence layer is a small **live-model benchmark** measuring schema success, first-pass
-validation, replan success, resource hallucination, unresolved-question behavior and qualified
-human usefulness scoring. Production extensions also include authenticated review, durable
-protected audit storage, structured constraints and scheduling, provider retry policy,
-fully locked dependency artifacts and deployment health monitoring.
+Useful next evidence would be qualified human usefulness scoring, deliberate repeated benchmark
+runs to measure variance, and a live case that naturally exercises bounded repair. Production
+extensions also include authenticated review, durable protected audit storage, structured
+constraints and scheduling, provider retry policy, fully locked dependency artifacts and
+deployment health monitoring.
